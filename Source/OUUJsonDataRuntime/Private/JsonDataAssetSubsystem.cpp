@@ -17,7 +17,7 @@
 
 //---------------------------------------------------------------------------------------------------------------------
 
-namespace OUU::Runtime::JsonData
+namespace OUU::JsonData::Runtime
 {
 	const FName GameRootName = TEXT("Game");
 
@@ -117,7 +117,7 @@ namespace OUU::Runtime::JsonData
 
 	bool ShouldIgnoreInvalidExtensions()
 	{
-		return JsonData::Private::CVar_IgnoreInvalidExtensions.GetValueOnAnyThread();
+		return OUU::JsonData::Runtime::Private::CVar_IgnoreInvalidExtensions.GetValueOnAnyThread();
 	}
 
 	bool ShouldReadFromCookedContent()
@@ -158,35 +158,34 @@ namespace OUU::Runtime::JsonData
 				UE_LOG(LogJsonDataAsset, Fatal, TEXT("Json path '%s' does not end in a single slash"), *Path);
 			}
 		};
-		CheckJsonPathFromConfig(JsonData::Private::GDataSource_Uncooked);
-		CheckJsonPathFromConfig(JsonData::Private::GDataSource_Cooked);
+		CheckJsonPathFromConfig(OUU::JsonData::Runtime::Private::GDataSource_Uncooked);
+		CheckJsonPathFromConfig(OUU::JsonData::Runtime::Private::GDataSource_Cooked);
 
-		if (FString::Printf(TEXT("/%s"), *JsonData::Private::GDataSource_Uncooked)
-			== JsonData::GetCacheMountPointRoot_Package(JsonData::GameRootName))
+		if (FString::Printf(TEXT("/%s"), *OUU::JsonData::Runtime::Private::GDataSource_Uncooked)
+			== OUU::JsonData::Runtime::GetCacheMountPointRoot_Package(OUU::JsonData::Runtime::GameRootName))
 		{
 			UE_LOG(
 				LogJsonDataAsset,
 				Fatal,
 				TEXT("Json Data source directory '%s' must have a different name than asset mount point '%s'"),
-				*JsonData::Private::GDataSource_Uncooked,
-				*FString(JsonData::GetCacheMountPointRoot_Package(JsonData::GameRootName)));
+				*OUU::JsonData::Runtime::Private::GDataSource_Uncooked,
+				*FString(OUU::JsonData::Runtime::GetCacheMountPointRoot_Package(OUU::JsonData::Runtime::GameRootName)));
 		}
 
-		if (JsonData::Private::GDataSource_Uncooked == JsonData::Private::GDataSource_Cooked)
+		if (OUU::JsonData::Runtime::Private::GDataSource_Uncooked
+			== OUU::JsonData::Runtime::Private::GDataSource_Cooked)
 		{
 			UE_LOG(
 				LogJsonDataAsset,
 				Fatal,
 				TEXT("Cooked and uncooked json paths must differ (%s, %s)"),
-				*JsonData::Private::GDataSource_Cooked,
-				*JsonData::Private::GDataSource_Uncooked)
+				*OUU::JsonData::Runtime::Private::GDataSource_Cooked,
+				*OUU::JsonData::Runtime::Private::GDataSource_Uncooked)
 		}
 #endif
 	}
 
-} // namespace OUU::Runtime::JsonData
-
-using namespace OUU::Runtime;
+} // namespace OUU::JsonData::Runtime
 
 void UJsonDataAssetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -194,28 +193,28 @@ void UJsonDataAssetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 	// Don't add to plugin root names!!!
 	// AllPluginRootNames.Add();
-	AllRootNames.Add(OUU::Runtime::JsonData::GameRootName);
+	AllRootNames.Add(OUU::JsonData::Runtime::GameRootName);
 
 	{
 		// #TODO-OUU Remove uncooked lookup in cooked build?
-		const auto UncookedSourceDir = OUU::Runtime::JsonData::Private::GDataSource_Uncooked;
+		const auto UncookedSourceDir = OUU::JsonData::Runtime::Private::GDataSource_Uncooked;
 		AllSourceDirectories_Uncooked.Add(UncookedSourceDir);
-		SourceDirectories_Uncooked.Add(OUU::Runtime::JsonData::GameRootName, UncookedSourceDir);
+		SourceDirectories_Uncooked.Add(OUU::JsonData::Runtime::GameRootName, UncookedSourceDir);
 	}
 	{
-		const auto CookedSourceDir = OUU::Runtime::JsonData::Private::GDataSource_Cooked;
+		const auto CookedSourceDir = OUU::JsonData::Runtime::Private::GDataSource_Cooked;
 		AllSourceDirectories_Cooked.Add(CookedSourceDir);
-		SourceDirectories_Cooked.Add(OUU::Runtime::JsonData::GameRootName, CookedSourceDir);
+		SourceDirectories_Cooked.Add(OUU::JsonData::Runtime::GameRootName, CookedSourceDir);
 	}
 
-	JsonData::CheckJsonPaths();
+	OUU::JsonData::Runtime::CheckJsonPaths();
 
 #if WITH_EDITOR
 	FEditorDelegates::OnPackageDeleted.AddUObject(this, &UJsonDataAssetSubsystem::HandlePackageDeleted);
 	FEditorDelegates::PreBeginPIE.AddUObject(this, &UJsonDataAssetSubsystem::HandlePreBeginPIE);
 #endif
 
-	RegisterMountPoints(OUU::Runtime::JsonData::GameRootName);
+	RegisterMountPoints(OUU::JsonData::Runtime::GameRootName);
 
 	auto& AssetRegistry = *IAssetRegistry::Get();
 	if (AssetRegistry.IsSearchAllAssets() == false || AssetRegistry.IsLoadingAssets())
@@ -243,7 +242,7 @@ void UJsonDataAssetSubsystem::Deinitialize()
 {
 	Super::Deinitialize();
 
-	UnregisterMountPoints(OUU::Runtime::JsonData::GameRootName);
+	UnregisterMountPoints(OUU::JsonData::Runtime::GameRootName);
 
 #if WITH_EDITOR
 	FEditorDelegates::OnPackageDeleted.RemoveAll(this);
@@ -275,8 +274,9 @@ void UJsonDataAssetSubsystem::NetSerializePath(FJsonDataAssetPath& Path, FArchiv
 
 	if (bHasPath)
 	{
-		bool bUsesFastSerialization = JsonData::Private::CVar_UseFastNetSerialization.GetValueOnGameThread()
-			&& SubsystemInstance && SubsystemInstance->bJsonDataAssetListBuilt;
+		bool bUsesFastSerialization =
+			OUU::JsonData::Runtime::Private::CVar_UseFastNetSerialization.GetValueOnGameThread() && SubsystemInstance
+			&& SubsystemInstance->bJsonDataAssetListBuilt;
 		int32 PathIndex = 0;
 		if (bUsesFastSerialization && Ar.IsSaving())
 		{
@@ -393,7 +393,7 @@ void UJsonDataAssetSubsystem::ImportAllAssets(bool bOnlyMissing)
 	}
 
 	bool bIgnoreErrorsDuringImport =
-		OUU::Runtime::JsonData::Private::CVar_IgnoreLoadErrorsDuringStartupImport.GetValueOnAnyThread();
+		OUU::JsonData::Runtime::Private::CVar_IgnoreLoadErrorsDuringStartupImport.GetValueOnAnyThread();
 
 	if (bIgnoreErrorsDuringImport)
 	{
@@ -430,11 +430,11 @@ void UJsonDataAssetSubsystem::RescanAllAssets()
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 	for (auto& RootName : AllRootNames)
 	{
-		auto SourceRoot = JsonData::GetSourceRoot_Full(RootName, EJsonDataAccessMode::Read);
+		auto SourceRoot = OUU::JsonData::Runtime::GetSourceRoot_Full(RootName, EJsonDataAccessMode::Read);
 		PlatformFile.IterateDirectoryRecursively(*SourceRoot, [&](const TCHAR* FilePath, bool bIsDirectory) -> bool {
 			if (bIsDirectory == false)
 			{
-				auto PackagePath = JsonData::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
+				auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
 				AllJsonDataAssetsByIndex.Add(FName(PackagePath));
 			}
 			return true;
@@ -467,7 +467,7 @@ void UJsonDataAssetSubsystem::RescanAllAssets()
 
 void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyMissing)
 {
-	const FString JsonDir = JsonData::GetSourceRoot_Full(RootName, EJsonDataAccessMode::Read);
+	const FString JsonDir = OUU::JsonData::Runtime::GetSourceRoot_Full(RootName, EJsonDataAccessMode::Read);
 	if (!FPaths::DirectoryExists(JsonDir))
 	{
 		// No need to import anything if there is no json source directory
@@ -489,7 +489,7 @@ void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyM
 
 		if (FPaths::GetBaseFilename(FilePath).Contains(".") || FPaths::GetExtension(FilePath) != TEXT("json"))
 		{
-			if (!JsonData::ShouldIgnoreInvalidExtensions())
+			if (!OUU::JsonData::Runtime::ShouldIgnoreInvalidExtensions())
 			{
 				UE_JSON_DATA_MESSAGELOG(
 					Warning,
@@ -504,7 +504,7 @@ void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyM
 
 		if (FPaths::GetBaseFilename(FilePath).Contains("."))
 		{
-			if (!JsonData::ShouldIgnoreInvalidExtensions())
+			if (!OUU::JsonData::Runtime::ShouldIgnoreInvalidExtensions())
 			{
 				UE_JSON_DATA_MESSAGELOG(
 					Warning,
@@ -518,7 +518,7 @@ void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyM
 			return true;
 		}
 
-		auto PackagePath = JsonData::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
+		auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
 
 		FString PackageFilename;
 		const bool bPackageAlreadyExists = FPackageName::DoesPackageExist(PackagePath, &PackageFilename);
@@ -610,7 +610,7 @@ void UJsonDataAssetSubsystem::AddPluginDataRoot(const FName& PluginName)
 		AllRootNames.Add(PluginName);
 		{
 			// Uncooked data files are split per plugin
-			auto UncookedSourceDir = PluginBaseDir / OUU::Runtime::JsonData::Private::GDataSource_Uncooked;
+			auto UncookedSourceDir = PluginBaseDir / OUU::JsonData::Runtime::Private::GDataSource_Uncooked;
 			FPaths::MakePathRelativeTo(UncookedSourceDir, *FPaths::ProjectDir());
 			AllSourceDirectories_Uncooked.Add(UncookedSourceDir);
 			SourceDirectories_Uncooked.Add(PluginName, UncookedSourceDir);
@@ -619,7 +619,7 @@ void UJsonDataAssetSubsystem::AddPluginDataRoot(const FName& PluginName)
 			// Cooked data files should go into a subfolder of the regular cooked data folder for easier packaging /
 			// redistribution
 			const auto CookedSourceDir =
-				OUU::Runtime::JsonData::Private::GDataSource_Cooked / TEXT("Plugins") / PluginName.ToString();
+				OUU::JsonData::Runtime::Private::GDataSource_Cooked / TEXT("Plugins") / PluginName.ToString();
 			AllSourceDirectories_Cooked.Add(CookedSourceDir);
 			SourceDirectories_Cooked.Add(PluginName, CookedSourceDir);
 		}
@@ -641,8 +641,8 @@ const TMap<FName, FString>& UJsonDataAssetSubsystem::GetSourceMappings(EJsonData
 {
 	switch (AccessMode)
 	{
-	case EJsonDataAccessMode::Read: return GetSourceMappings(OUU::Runtime::JsonData::ShouldReadFromCookedContent());
-	case EJsonDataAccessMode::Write: return GetSourceMappings(OUU::Runtime::JsonData::ShouldWriteToCookedContent());
+	case EJsonDataAccessMode::Read: return GetSourceMappings(OUU::JsonData::Runtime::ShouldReadFromCookedContent());
+	case EJsonDataAccessMode::Write: return GetSourceMappings(OUU::JsonData::Runtime::ShouldWriteToCookedContent());
 	default: checkf(false, TEXT("Invalid access mode")); return SourceDirectories_Uncooked;
 	}
 }
@@ -657,10 +657,10 @@ const TArray<FString>& UJsonDataAssetSubsystem::GetAllSourceDirectories(EJsonDat
 	switch (AccessMode)
 	{
 	case EJsonDataAccessMode::Read:
-		return OUU::Runtime::JsonData::ShouldReadFromCookedContent() ? AllSourceDirectories_Cooked
+		return OUU::JsonData::Runtime::ShouldReadFromCookedContent() ? AllSourceDirectories_Cooked
 																	 : AllSourceDirectories_Uncooked;
 	case EJsonDataAccessMode::Write:
-		return OUU::Runtime::JsonData::ShouldWriteToCookedContent() ? AllSourceDirectories_Cooked
+		return OUU::JsonData::Runtime::ShouldWriteToCookedContent() ? AllSourceDirectories_Cooked
 																	: AllSourceDirectories_Uncooked;
 	default: checkf(false, TEXT("Invalid access mode")); return AllSourceDirectories_Uncooked;
 	}
@@ -668,7 +668,7 @@ const TArray<FString>& UJsonDataAssetSubsystem::GetAllSourceDirectories(EJsonDat
 
 FString UJsonDataAssetSubsystem::GetVirtualRoot(const FName& RootName) const
 {
-	return (RootName == OUU::Runtime::JsonData::GameRootName)
+	return (RootName == OUU::JsonData::Runtime::GameRootName)
 		? TEXT("/JsonData/")
 		: FString::Printf(TEXT("/JsonData/Plugins/%s/"), *RootName.ToString());
 }
@@ -677,7 +677,7 @@ FName UJsonDataAssetSubsystem::GetRootNameForPackagePath(const FString& PackageP
 {
 	if (PackagePath.StartsWith(TEXT("/JsonData/Plugins/")) == false)
 	{
-		return OUU::Runtime::JsonData::GameRootName;
+		return OUU::JsonData::Runtime::GameRootName;
 	}
 
 	for (auto& RootName : AllPluginRootNames)
@@ -694,8 +694,8 @@ FName UJsonDataAssetSubsystem::GetRootNameForPackagePath(const FString& PackageP
 FName UJsonDataAssetSubsystem::GetRootNameForSourcePath(const FString& SourcePath) const
 {
 	// Assume Game is most common, so test it first
-	if (IsPathInSourceDirectoryOfNamedRoot(SourcePath, OUU::Runtime::JsonData::GameRootName))
-		return OUU::Runtime::JsonData::GameRootName;
+	if (IsPathInSourceDirectoryOfNamedRoot(SourcePath, OUU::JsonData::Runtime::GameRootName))
+		return OUU::JsonData::Runtime::GameRootName;
 
 	// Then go through all plugins
 	for (auto& PluginName : AllPluginRootNames)
@@ -731,31 +731,31 @@ void UJsonDataAssetSubsystem::RegisterMountPoints(const FName& RootName)
 	// Make sure that the asset cache is always cleared for new mount roots.
 	CleanupAssetCache(RootName);
 
-	if (JsonData::ShouldUseSeparateSourceMountRoot())
+	if (OUU::JsonData::Runtime::ShouldUseSeparateSourceMountRoot())
 	{
 		FPackageName::RegisterMountPoint(
-			JsonData::GetSourceMountPointRoot_Package(RootName),
-			JsonData::GetSourceMountPointRoot_DiskFull(RootName));
+			OUU::JsonData::Runtime::GetSourceMountPointRoot_Package(RootName),
+			OUU::JsonData::Runtime::GetSourceMountPointRoot_DiskFull(RootName));
 	}
 #endif
 
 	FPackageName::RegisterMountPoint(
-		JsonData::GetCacheMountPointRoot_Package(RootName),
-		JsonData::GetCacheMountPointRoot_DiskFull(RootName));
+		OUU::JsonData::Runtime::GetCacheMountPointRoot_Package(RootName),
+		OUU::JsonData::Runtime::GetCacheMountPointRoot_DiskFull(RootName));
 }
 
 void UJsonDataAssetSubsystem::UnregisterMountPoints(const FName& RootName)
 {
 	FPackageName::UnRegisterMountPoint(
-		JsonData::GetCacheMountPointRoot_Package(RootName),
-		JsonData::GetCacheMountPointRoot_DiskFull(RootName));
+		OUU::JsonData::Runtime::GetCacheMountPointRoot_Package(RootName),
+		OUU::JsonData::Runtime::GetCacheMountPointRoot_DiskFull(RootName));
 
 #if WITH_EDITOR
-	if (JsonData::ShouldUseSeparateSourceMountRoot())
+	if (OUU::JsonData::Runtime::ShouldUseSeparateSourceMountRoot())
 	{
 		FPackageName::UnRegisterMountPoint(
-			JsonData::GetSourceMountPointRoot_Package(RootName),
-			JsonData::GetSourceMountPointRoot_DiskFull(RootName));
+			OUU::JsonData::Runtime::GetSourceMountPointRoot_Package(RootName),
+			OUU::JsonData::Runtime::GetSourceMountPointRoot_DiskFull(RootName));
 	}
 #endif
 }
@@ -764,7 +764,7 @@ void UJsonDataAssetSubsystem::HandleAssetRegistryInitialized()
 {
 	RescanAllAssets();
 
-	if (JsonData::Private::CVar_ImportAllAssetsOnStartup.GetValueOnGameThread())
+	if (OUU::JsonData::Runtime::Private::CVar_ImportAllAssetsOnStartup.GetValueOnGameThread())
 	{
 		ImportAllAssets(true);
 	}
@@ -780,14 +780,14 @@ void UJsonDataAssetSubsystem::HandlePreBeginPIE(const bool bIsSimulating)
 void UJsonDataAssetSubsystem::CleanupAssetCache(const FName& RootName)
 {
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-	const FString MountDiskPath = JsonData::GetCacheMountPointRoot_DiskFull(RootName);
+	const FString MountDiskPath = OUU::JsonData::Runtime::GetCacheMountPointRoot_DiskFull(RootName);
 	if (PlatformFile.DirectoryExists(*MountDiskPath) == false)
 	{
 		// No existing cache
 		return;
 	}
 
-	if (JsonData::Private::CVar_PurgeAssetCacheOnStartup.GetValueOnGameThread())
+	if (OUU::JsonData::Runtime::Private::CVar_PurgeAssetCacheOnStartup.GetValueOnGameThread())
 	{
 		// Delete the directory on-disk before mounting the directory to purge all generated uasset files.
 		PlatformFile.DeleteDirectoryRecursively(*MountDiskPath);
@@ -825,9 +825,9 @@ void UJsonDataAssetSubsystem::CleanupAssetCache(const FName& RootName)
 
 		RelativePath = RelativePath.Mid(0, RelativePath.Len() - AssetExtension.Len());
 
-		auto PackagePath = JsonData::GetCacheMountPointRoot_Package(RootName).Append(RelativePath);
+		auto PackagePath = OUU::JsonData::Runtime::GetCacheMountPointRoot_Package(RootName).Append(RelativePath);
 
-		auto SourcePath = JsonData::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Read);
+		auto SourcePath = OUU::JsonData::Runtime::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Read);
 		if (PlatformFile.FileExists(*SourcePath) == false)
 		{
 			PlatformFile.DeleteFile(FilePath);
@@ -863,10 +863,10 @@ void UJsonDataAssetSubsystem::HandlePackageDeleted(UPackage* Package)
 {
 	auto PackagePath = Package->GetPathName();
 
-	if (!JsonData::PackageIsJsonData(PackagePath))
+	if (!OUU::JsonData::Runtime::PackageIsJsonData(PackagePath))
 		return;
 
-	JsonData::Private::Delete(PackagePath);
+	OUU::JsonData::Runtime::Private::Delete(PackagePath);
 }
 
 void UJsonDataAssetSubsystem::ModifyCook(TArray<FString>& OutExtraPackagesToCook)
@@ -896,7 +896,7 @@ void UJsonDataAssetSubsystem::ModifyCook(TArray<FString>& OutExtraPackagesToCook
 
 void UJsonDataAssetSubsystem::ModifyCook(const FName& RootName, TSet<FName>& OutDependencyPackages)
 {
-	const FString JsonDir_READ = JsonData::GetSourceRoot_Full(RootName, EJsonDataAccessMode::Read);
+	const FString JsonDir_READ = OUU::JsonData::Runtime::GetSourceRoot_Full(RootName, EJsonDataAccessMode::Read);
 	if (!FPaths::DirectoryExists(JsonDir_READ))
 	{
 		return;
@@ -917,10 +917,10 @@ void UJsonDataAssetSubsystem::ModifyCook(const FName& RootName, TSet<FName>& Out
 		if (FPaths::GetExtension(FilePath) != TEXT("json"))
 			return true;
 
-		if (OUU::Runtime::JsonData::ShouldIgnoreInvalidExtensions() && FPaths::GetBaseFilename(FilePath).Contains("."))
+		if (OUU::JsonData::Runtime::ShouldIgnoreInvalidExtensions() && FPaths::GetBaseFilename(FilePath).Contains("."))
 			return true;
 
-		auto PackagePath = JsonData::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
+		auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
 		auto Path = FJsonDataAssetPath::FromPackagePath(PackagePath);
 
 		auto* LoadedJsonDataAsset = Path.LoadSynchronous();
@@ -929,7 +929,7 @@ void UJsonDataAssetSubsystem::ModifyCook(const FName& RootName, TSet<FName>& Out
 
 		LoadedJsonDataAsset->ExportJsonFile();
 
-		auto ObjectName = OUU::Runtime::JsonData::PackageToObjectName(PackagePath);
+		auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(PackagePath);
 		FAssetIdentifier AssetIdentifier(*PackagePath, *ObjectName);
 
 		TArray<FAssetIdentifier> Dependencies;
@@ -940,7 +940,7 @@ void UJsonDataAssetSubsystem::ModifyCook(const FName& RootName, TSet<FName>& Out
 			if (Dependency.IsPackage())
 			{
 				auto PackageName = Dependency.PackageName;
-				if (JsonData::PackageIsJsonData(PackageName.ToString()) == false)
+				if (OUU::JsonData::Runtime::PackageIsJsonData(PackageName.ToString()) == false)
 				{
 					// We don't want to add json data assets directly to this list.
 					// As they are on the do not cook list, they will throw errors.

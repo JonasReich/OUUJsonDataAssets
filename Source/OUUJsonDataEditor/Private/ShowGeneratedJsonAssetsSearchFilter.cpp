@@ -112,7 +112,7 @@ void UShowGeneratedJsonAssetsSearchFilter::AddFrontEndFilterExtensions(
 	TArray<TSharedRef<class FFrontendFilter>>& InOutFilterList) const
 {
 	// Only add this filter if source files and generated files are in the same folder
-	if (OUU::Runtime::JsonData::ShouldWriteToCookedContent() == false)
+	if (OUU::JsonData::Runtime::ShouldWriteToCookedContent() == false)
 	{
 		InOutFilterList.Add(MakeShareable(new FFrontendFilter_ShowGeneratedJsonAssets(DefaultCategory)));
 	}

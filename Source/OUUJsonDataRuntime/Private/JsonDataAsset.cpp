@@ -26,12 +26,12 @@
 	#include "Misc/DataValidation.h"
 #endif
 
-namespace OUU::Runtime::JsonData::Private
+namespace OUU::JsonData::Runtime::Private
 {
 	void Delete(const FString& PackagePath)
 	{
-		auto FullPath = OUU::Runtime::JsonData::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Write);
-		if (OUU::Runtime::JsonData::ShouldWriteToCookedContent())
+		auto FullPath = OUU::JsonData::Runtime::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Write);
+		if (OUU::JsonData::Runtime::ShouldWriteToCookedContent())
 		{
 			IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 			PlatformFile.DeleteFile(*FullPath);
@@ -49,15 +49,13 @@ namespace OUU::Runtime::JsonData::Private
 #endif
 		}
 	}
-} // namespace OUU::Runtime::JsonData::Private
-
-using namespace OUU::Runtime;
+} // namespace OUU::JsonData::Runtime::Private
 
 //---------------------------------------------------------------------------------------------------------------------
 
 bool UJsonDataAsset::IsInJsonDataContentRoot() const
 {
-	return JsonData::PackageIsJsonData(GetPackage()->GetPathName());
+	return OUU::JsonData::Runtime::PackageIsJsonData(GetPackage()->GetPathName());
 }
 
 bool UJsonDataAsset::IsFileBasedJsonAsset() const
@@ -191,7 +189,7 @@ TSharedRef<FJsonObject> UJsonDataAsset::ExportJson() const
 		// Data going into the cooked content directory should write all properties into the files to have a baseline
 		// for modders. Data going into the regular editor saves should perform delta serialization to support
 		// propagation of values from base class defaults.
-		bool bOnlyModifiedProperties = OUU::Runtime::JsonData::ShouldWriteToCookedContent() == false;
+		bool bOnlyModifiedProperties = OUU::JsonData::Runtime::ShouldWriteToCookedContent() == false;
 
 		Result->SetObjectField(
 			TEXT("Data"),
@@ -203,7 +201,7 @@ TSharedRef<FJsonObject> UJsonDataAsset::ExportJson() const
 
 FString UJsonDataAsset::GetJsonFilePathAbs(EJsonDataAccessMode AccessMode) const
 {
-	return JsonData::PackageToSourceFull(GetPackage()->GetPathName(), AccessMode);
+	return OUU::JsonData::Runtime::PackageToSourceFull(GetPackage()->GetPathName(), AccessMode);
 }
 
 FJsonDataAssetPath UJsonDataAsset::GetPath() const
@@ -270,7 +268,7 @@ bool UJsonDataAsset::ExportJsonFile() const
 	}
 
 #if WITH_EDITOR
-	if (JsonData::ShouldWriteToCookedContent() == false)
+	if (OUU::JsonData::Runtime::ShouldWriteToCookedContent() == false)
 	{
 		USourceControlHelpers::CheckOutFile(SavePath, true);
 	}
@@ -284,7 +282,7 @@ bool UJsonDataAsset::ExportJsonFile() const
 	UE_LOG(LogJsonDataAsset, Log, TEXT("ExportJsonFile - Saved %s"), *SavePath);
 
 #if WITH_EDITOR
-	if (JsonData::ShouldWriteToCookedContent() == false)
+	if (OUU::JsonData::Runtime::ShouldWriteToCookedContent() == false)
 	{
 		if (USourceControlHelpers::CheckOutOrAddFile(SavePath) == false)
 		{
@@ -333,7 +331,7 @@ UJsonDataAsset* UJsonDataAsset::LoadJsonDataAsset_Internal(FJsonDataAssetPath Pa
 	}
 
 	const FString InPackagePath = Path.GetPackagePath();
-	const FString LoadPath = JsonData::PackageToSourceFull(InPackagePath, EJsonDataAccessMode::Read);
+	const FString LoadPath = OUU::JsonData::Runtime::PackageToSourceFull(InPackagePath, EJsonDataAccessMode::Read);
 
 	if (!FPaths::FileExists(LoadPath))
 	{
@@ -371,7 +369,7 @@ UJsonDataAsset* UJsonDataAsset::LoadJsonDataAsset_Internal(FJsonDataAssetPath Pa
 		return nullptr;
 	}
 
-	const FString ObjectName = JsonData::PackageToObjectName(InPackagePath);
+	const FString ObjectName = OUU::JsonData::Runtime::PackageToObjectName(InPackagePath);
 	FString PackageFilename;
 
 	// Even if existing asset was not passed in, it still might be on disk.
@@ -475,7 +473,7 @@ void UJsonDataAsset::PostRename(UObject* OldOuter, const FName OldName)
 	}
 
 	auto OldPackagePathName = OldOuter->GetPathName();
-	JsonData::Private::Delete(OldPackagePathName);
+	OUU::JsonData::Runtime::Private::Delete(OldPackagePathName);
 
 	{
 		if (UObjectRedirector* Redirector = FindObjectFast<UObjectRedirector>(OldOuter, OldName))

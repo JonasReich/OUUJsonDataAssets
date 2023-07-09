@@ -38,7 +38,7 @@ bool UAssetValidator_JsonDataAssetReferences::HasJsonDependency(UObject* InAsset
 {
 	// The game root is also the virtual root of plugin content, so we don't have to iterate over plugin roots
 	// (this is rarely the case!)
-	auto JsonContentRoot = OUU::Runtime::JsonData::GetCacheMountPointRoot_Package(OUU::Runtime::JsonData::GameRootName);
+	auto JsonContentRoot = OUU::JsonData::Runtime::GetCacheMountPointRoot_Package(OUU::JsonData::Runtime::GameRootName);
 
 	TArray<FAssetIdentifier> Dependencies;
 	IAssetRegistry::Get()->GetDependencies(FAssetIdentifier(InAsset->GetOutermost()->GetFName()), OUT Dependencies);
@@ -68,7 +68,7 @@ EDataValidationResult UAssetValidator_JsonDataAssetReferences::ValidateLoadedAss
 		FJsonDataAssetPath::StaticStruct()->FindPropertyByName(GET_MEMBER_NAME_CHECKED(FJsonDataAssetPath, Path));
 
 	// Again we only really care if it's in _any_ json content root, which are all underneath the game root.
-	auto JsonContentRoot = OUU::Runtime::JsonData::GetCacheMountPointRoot_Package(OUU::Runtime::JsonData::GameRootName);
+	auto JsonContentRoot = OUU::JsonData::Runtime::GetCacheMountPointRoot_Package(OUU::JsonData::Runtime::GameRootName);
 
 	for (auto& FieldAndValue : TPropertyValueRange<FObjectPropertyBase>(InAsset->GetClass(), InAsset))
 	{

@@ -26,7 +26,7 @@ namespace OUU::JsonData::Editor::Private
 		TSharedPtr<FContentBrowserDataDragDropOp> ContentDragDropOp)
 	{
 		auto Files = ContentDragDropOp->GetDraggedFiles();
-		auto Root = OUU::Runtime::JsonData::GetSourceMountPointRoot_Package(OUU::Runtime::JsonData::GameRootName);
+		auto Root = OUU::JsonData::Runtime::GetSourceMountPointRoot_Package(OUU::JsonData::Runtime::GameRootName);
 		auto Prefix = FString::Printf(TEXT("/All%s"), *Root);
 		for (auto File : Files)
 		{
@@ -317,7 +317,7 @@ void FJsonDataAssetPathCustomization::CustomizeHeader(
 			if (OptJsonPath.IsSet())
 			{
 				auto JsonPackagePath = OptJsonPath->GetPackagePath();
-				auto ObjectName = OUU::Runtime::JsonData::PackageToObjectName(JsonPackagePath);
+				auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(JsonPackagePath);
 
 				auto AssetData = IAssetRegistry::Get()->GetAssetByObjectPath(
 					FSoftObjectPath(JsonPackagePath + TEXT(".") + ObjectName));
@@ -337,7 +337,7 @@ void FJsonDataAssetPathCustomization::CustomizeHeader(
 			if (OptJsonPath.IsSet())
 			{
 				auto JsonPackagePath = OptJsonPath->GetPackagePath();
-				auto ObjectName = OUU::Runtime::JsonData::PackageToObjectName(JsonPackagePath);
+				auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(JsonPackagePath);
 				PathPropertyHandle->SetValueFromFormattedString(JsonPackagePath + TEXT(".") + ObjectName);
 				return FReply::Handled();
 			}

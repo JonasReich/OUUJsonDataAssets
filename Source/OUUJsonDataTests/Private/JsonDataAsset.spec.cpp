@@ -179,12 +179,12 @@ void FJsonDataAssetSpec::Define()
 	Describe("UtilFuncs", [this]() {
 		Describe("PackageToObjectName", [this]() {
 			It("should return the package name for a package path", [this]() {
-				auto ObjectName = OUU::Runtime::JsonData::PackageToObjectName(TEXT("/JsonData/Folder/PackageName"));
+				auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(TEXT("/JsonData/Folder/PackageName"));
 				SPEC_TEST_EQUAL(ObjectName, TEXT("PackageName"));
 			});
 
 			It("should return an empty string for a string that does not contain slashes", [this]() {
-				auto ObjectName = OUU::Runtime::JsonData::PackageToObjectName(TEXT("ObjectName"));
+				auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(TEXT("ObjectName"));
 				SPEC_TEST_EQUAL(ObjectName, TEXT(""));
 			});
 		});
@@ -194,9 +194,9 @@ void FJsonDataAssetSpec::Define()
 				It("should return the same path", [this]() {
 					auto PackagePath = TEXT("/JsonData/Folder/PackageName");
 					auto SourcePath =
-						OUU::Runtime::JsonData::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Read);
+						OUU::JsonData::Runtime::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Read);
 					auto PackagePathResult =
-						OUU::Runtime::JsonData::SourceFullToPackage(SourcePath, EJsonDataAccessMode::Read);
+						OUU::JsonData::Runtime::SourceFullToPackage(SourcePath, EJsonDataAccessMode::Read);
 					SPEC_TEST_EQUAL(PackagePath, PackagePathResult);
 				});
 			});
@@ -204,9 +204,9 @@ void FJsonDataAssetSpec::Define()
 				It("should return the same path", [this]() {
 					auto PackagePath = TEXT("/JsonData/Folder/PackageName");
 					auto SourcePath =
-						OUU::Runtime::JsonData::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Write);
+						OUU::JsonData::Runtime::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Write);
 					auto PackagePathResult =
-						OUU::Runtime::JsonData::SourceFullToPackage(SourcePath, EJsonDataAccessMode::Write);
+						OUU::JsonData::Runtime::SourceFullToPackage(SourcePath, EJsonDataAccessMode::Write);
 					SPEC_TEST_EQUAL(PackagePath, PackagePathResult);
 				});
 			});

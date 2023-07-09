@@ -7,7 +7,7 @@
 #include "JsonDataAsset.h"
 
 // Global utility functions for json data asset system.
-namespace OUU::Runtime::JsonData
+namespace OUU::JsonData::Runtime
 {
 	// If true, a separate package root is used for source files.
 	OUUJSONDATARUNTIME_API bool ShouldUseSeparateSourceMountRoot();
@@ -50,4 +50,4 @@ namespace OUU::Runtime::JsonData
 		// not API exposed, because it's only for internal use
 		void Delete(const FString& PackagePath);
 	} // namespace Private
-} // namespace OUU::Runtime::JsonData
+} // namespace OUU::JsonData::Runtime

@@ -80,7 +80,7 @@ void FJsonDataAssetPath::SetPackagePath(const FString& InPackagePath)
 			 "path!"),
 		*InPackagePath);
 
-	auto ObjectName = OUU::Runtime::JsonData::PackageToObjectName(InPackagePath);
+	auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(InPackagePath);
 	Path = FSoftObjectPath(FString::Printf(TEXT("%s.%s"), *InPackagePath, *ObjectName));
 }
 

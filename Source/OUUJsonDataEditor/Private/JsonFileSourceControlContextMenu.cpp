@@ -326,7 +326,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCCheckIn()
 	for (auto& FileName : FileNames)
 	{
 		auto JsonPath = FJsonDataAssetPath::FromPackagePath(
-			OUU::Runtime::JsonData::SourceFullToPackage(FileName, EJsonDataAccessMode::Read));
+			OUU::JsonData::Runtime::SourceFullToPackage(FileName, EJsonDataAccessMode::Read));
 		if (auto AssetObject = JsonPath.ResolveObject())
 		{
 			Assets.Add(AssetObject->GetOutermost());
@@ -447,7 +447,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCRevert()
 			for (auto& File : FilesToRevert)
 			{
 				auto JsonPath = FJsonDataAssetPath::FromPackagePath(
-					OUU::Runtime::JsonData::SourceFullToPackage(File, EJsonDataAccessMode::Read));
+					OUU::JsonData::Runtime::SourceFullToPackage(File, EJsonDataAccessMode::Read));
 
 				OUU::Editor::JsonData::Reload(JsonPath);
 			}
@@ -459,7 +459,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCRevert()
 			for (auto& File : FilesToDelete)
 			{
 				auto JsonPath = FJsonDataAssetPath::FromPackagePath(
-					OUU::Runtime::JsonData::SourceFullToPackage(File, EJsonDataAccessMode::Read));
+					OUU::JsonData::Runtime::SourceFullToPackage(File, EJsonDataAccessMode::Read));
 				if (auto* Asset = JsonPath.ResolveObject())
 				{
 					AssetsToDelete.Add(Asset);

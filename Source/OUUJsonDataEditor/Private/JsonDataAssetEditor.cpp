@@ -37,8 +37,8 @@ namespace OUU::Editor::JsonData
 		{
 			PackagePath.ReplaceInline(TEXT(".json"), TEXT(""));
 			PackagePath.ReplaceInline(
-				*OUU::Runtime::JsonData::GetSourceMountPointRoot_Package(OUU::Runtime::JsonData::GameRootName),
-				*OUU::Runtime::JsonData::GetCacheMountPointRoot_Package(OUU::Runtime::JsonData::GameRootName));
+				*OUU::JsonData::Runtime::GetSourceMountPointRoot_Package(OUU::JsonData::Runtime::GameRootName),
+				*OUU::JsonData::Runtime::GetCacheMountPointRoot_Package(OUU::JsonData::Runtime::GameRootName));
 		}
 
 		FJsonDataAssetPath JsonPath;
@@ -50,11 +50,11 @@ namespace OUU::Editor::JsonData
 	{
 		// Otherwise assume it's a folder
 		const bool bIsJsonFile = InSourceFilePath.EndsWith(TEXT(".json"));
-		
+
 		if (bIsJsonFile && FPaths::GetBaseFilename(InSourceFilePath).Contains("."))
 		{
 			UE_CLOG(
-				(OUU::Runtime::JsonData::ShouldIgnoreInvalidExtensions() == false),
+				(OUU::JsonData::Runtime::ShouldIgnoreInvalidExtensions() == false),
 				LogJsonDataAsset,
 				Warning,
 				TEXT("'%s' has an invalid extension (only a simple '.json' is permitted)"),
@@ -74,7 +74,7 @@ namespace OUU::Editor::JsonData
 
 		if (bIsJsonFile)
 		{
-			MountedAssetPath.Append(TEXT(".")).Append(OUU::Runtime::JsonData::PackageToObjectName(JsonDataPackagePath));
+			MountedAssetPath.Append(TEXT(".")).Append(OUU::JsonData::Runtime::PackageToObjectName(JsonDataPackagePath));
 		}
 
 		return MountedAssetPath;
@@ -104,9 +104,9 @@ namespace OUU::Editor::JsonData
 	void PerformDiff(const FJsonDataAssetPath& Old, const FJsonDataAssetPath& New)
 	{
 		FString OldTextFilename =
-			OUU::Runtime::JsonData::PackageToSourceFull(Old.GetPackagePath(), EJsonDataAccessMode::Read);
+			OUU::JsonData::Runtime::PackageToSourceFull(Old.GetPackagePath(), EJsonDataAccessMode::Read);
 		FString NewTextFilename =
-			OUU::Runtime::JsonData::PackageToSourceFull(New.GetPackagePath(), EJsonDataAccessMode::Read);
+			OUU::JsonData::Runtime::PackageToSourceFull(New.GetPackagePath(), EJsonDataAccessMode::Read);
 		FString DiffCommand = GetDefault<UEditorLoadingSavingSettings>()->TextDiffToolPath.FilePath;
 
 		IAssetTools::Get().CreateDiffProcess(DiffCommand, OldTextFilename, NewTextFilename);
@@ -137,7 +137,7 @@ namespace OUU::Editor::JsonData
 		for (auto Path : Paths)
 		{
 			auto PackagePath = Path.GetPackagePath();
-			auto ObjectName = OUU::Runtime::JsonData::PackageToObjectName(PackagePath);
+			auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(PackagePath);
 			FString ContentBrowserItemPath = FString::Printf(TEXT("/All%s.%s"), *PackagePath, *ObjectName);
 			PathStrings.Add(ContentBrowserItemPath);
 		}
@@ -154,8 +154,8 @@ namespace OUU::Editor::JsonData
 			auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForPackagePath(PackagePath);
 
 			PackagePath.ReplaceInline(
-				*OUU::Runtime::JsonData::GetCacheMountPointRoot_Package(RootName),
-				*OUU::Runtime::JsonData::GetSourceMountPointRoot_Package(RootName));
+				*OUU::JsonData::Runtime::GetCacheMountPointRoot_Package(RootName),
+				*OUU::JsonData::Runtime::GetSourceMountPointRoot_Package(RootName));
 			FString ContentBrowserItemPath = FString::Printf(TEXT("/All%s.json"), *PackagePath);
 			PathStrings.Add(ContentBrowserItemPath);
 		}
@@ -176,7 +176,7 @@ namespace OUU::Editor::JsonData
 	}
 	void ContentBrowser_OpenExternalEditor(const FJsonDataAssetPath& Path)
 	{
-		auto DiskPath = OUU::Runtime::JsonData::PackageToSourceFull(Path.GetPackagePath(), EJsonDataAccessMode::Read);
+		auto DiskPath = OUU::JsonData::Runtime::PackageToSourceFull(Path.GetPackagePath(), EJsonDataAccessMode::Read);
 		FPlatformProcess::LaunchFileInDefaultExternalApplication(*DiskPath, nullptr, ELaunchVerb::Edit);
 	}
 } // namespace OUU::Editor::JsonData

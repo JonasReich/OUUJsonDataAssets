@@ -9,7 +9,7 @@
 // Console variable declarations for json data asset runtime.
 // Not in Public/ folder, because they should only be used directly by the system internal code.
 // See cpp file for more detailed descriptions on each variable.
-namespace OUU::Runtime::JsonData::Private
+namespace OUU::JsonData::Runtime::Private
 {
 	// Bool switches
 	extern TAutoConsoleVariable<bool> CVar_SeparateSourceMountRoot;
@@ -25,4 +25,4 @@ namespace OUU::Runtime::JsonData::Private
 
 	// Console commands
 	extern FAutoConsoleCommand CCommand_ReimportAllAssets;
-} // namespace OUU::Runtime::JsonData::Private
+} // namespace OUU::JsonData::Runtime::Private

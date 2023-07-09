@@ -447,7 +447,7 @@ FContentBrowserJsonDataSource::FContentBrowserJsonDataSource()
 	JsonFileActions.CanCreate.BindLambda(
 		[](const FName InDestFolderPath, const FString& InDestFolder, FText* OutErrorMsg) -> bool {
 			auto PluginsRoot =
-				OUU::Runtime::JsonData::GetSourceMountPointRoot_Package(OUU::Runtime::JsonData::GameRootName)
+				OUU::JsonData::Runtime::GetSourceMountPointRoot_Package(OUU::JsonData::Runtime::GameRootName)
 				+ "Plugins";
 
 			if (PluginsRoot.Equals(*InDestFolderPath.ToString(), ESearchCase::IgnoreCase))
@@ -493,7 +493,7 @@ FContentBrowserJsonDataSource::FContentBrowserJsonDataSource()
 			}
 
 			// InFilenameWrong is wrong for plugin mounted files. It's correct after converting back and forth though.
-			auto PackagePath = OUU::Runtime::JsonData::SourceFullToPackage(InFilenameWrong, EJsonDataAccessMode::Read);
+			auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(InFilenameWrong, EJsonDataAccessMode::Read);
 			return CreateNewJsonAssetWithClass(PackagePath, Class);
 		});
 
@@ -514,8 +514,8 @@ FContentBrowserJsonDataSource::FContentBrowserJsonDataSource()
 	{
 		FCoreDelegates::OnAllModuleLoadingPhasesComplete.AddLambda([this]() {
 			auto AddMountLambda = [this](const FName& RootName) {
-				auto FileMountPath = OUU::Runtime::JsonData::GetSourceMountPointRoot_Package(RootName);
-				auto FileMountDiskPath = OUU::Runtime::JsonData::GetSourceMountPointRoot_DiskFull(RootName);
+				auto FileMountPath = OUU::JsonData::Runtime::GetSourceMountPointRoot_Package(RootName);
+				auto FileMountDiskPath = OUU::JsonData::Runtime::GetSourceMountPointRoot_DiskFull(RootName);
 				// Both of these paths have a trailing slash, but AddFileMount expects no trailing slash
 				FileMountPath.RemoveFromEnd(TEXT("/"));
 				FileMountDiskPath.RemoveFromEnd(TEXT("/"));
@@ -524,7 +524,7 @@ FContentBrowserJsonDataSource::FContentBrowserJsonDataSource()
 			};
 
 			// Always add a mount point for the game data folder
-			AddMountLambda(OUU::Runtime::JsonData::GameRootName);
+			AddMountLambda(OUU::JsonData::Runtime::GameRootName);
 
 			// Also add mount points for all plugins that are already registered...
 			for (auto& PluginRootName : UJsonDataAssetSubsystem::Get().GetAllPluginRootNames())
@@ -617,7 +617,7 @@ void FContentBrowserJsonDataSource::PopulateJsonFileContextMenu(UToolMenu* Conte
 			const FExecuteAction ReloadAction = FExecuteAction::CreateLambda([this, SelectedJsonFiles]() {
 				for (const TSharedRef<const FContentBrowserFileItemDataPayload>& SelectedJsonFile : SelectedJsonFiles)
 				{
-					auto JsonPath = FJsonDataAssetPath::FromPackagePath(OUU::Runtime::JsonData::SourceFullToPackage(
+					auto JsonPath = FJsonDataAssetPath::FromPackagePath(OUU::JsonData::Runtime::SourceFullToPackage(
 						SelectedJsonFile->GetFilename(),
 						EJsonDataAccessMode::Read));
 
@@ -638,7 +638,7 @@ void FContentBrowserJsonDataSource::PopulateJsonFileContextMenu(UToolMenu* Conte
 					TArray<FJsonDataAssetPath> Paths;
 					for (auto& SelectedJsonFile : SelectedJsonFiles)
 					{
-						auto JsonPath = FJsonDataAssetPath::FromPackagePath(OUU::Runtime::JsonData::SourceFullToPackage(
+						auto JsonPath = FJsonDataAssetPath::FromPackagePath(OUU::JsonData::Runtime::SourceFullToPackage(
 							SelectedJsonFile->GetFilename(),
 							EJsonDataAccessMode::Read));
 						Paths.Add(JsonPath);
@@ -714,7 +714,7 @@ bool FContentBrowserJsonDataSource::ItemPassesFilter(
 	const bool bIsFile)
 {
 	// Ignore files and folders with dots in them (besides the extension .)
-	if (OUU::Runtime::JsonData::ShouldIgnoreInvalidExtensions())
+	if (OUU::JsonData::Runtime::ShouldIgnoreInvalidExtensions())
 	{
 		// len(".json") -> 5
 		FStringView FilenameWithoutSuffix(*InFilename, FMath::Min(InFilename.Len() - 5, 0));
@@ -765,7 +765,7 @@ bool FContentBrowserJsonDataSource::GetItemAttribute(
 	if (InAttributeKey == ContentBrowserItemAttributes::ItemIsProjectContent)
 	{
 		auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForSourcePath(InFilePath.ToString());
-		const bool bIsProjectFolder = RootName == OUU::Runtime::JsonData::GameRootName;
+		const bool bIsProjectFolder = RootName == OUU::JsonData::Runtime::GameRootName;
 		OutAttributeValue.SetValue(bIsProjectFolder);
 		return true;
 	}
@@ -774,7 +774,7 @@ bool FContentBrowserJsonDataSource::GetItemAttribute(
 	{
 		auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForSourcePath(InFilePath.ToString());
 		// All files in other roots are guaranteed from plugins.
-		const bool bIsPluginFolder = RootName != OUU::Runtime::JsonData::GameRootName;
+		const bool bIsPluginFolder = RootName != OUU::JsonData::Runtime::GameRootName;
 		OutAttributeValue.SetValue(bIsPluginFolder);
 		return true;
 	}
@@ -784,9 +784,9 @@ bool FContentBrowserJsonDataSource::GetItemAttribute(
 
 bool FContentBrowserJsonDataSource::CreateNewJsonAssetWithClass(const FString& PackagePath, UClass* AssetClass)
 {
-	auto FileNameCorrected = OUU::Runtime::JsonData::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Read);
+	auto FileNameCorrected = OUU::JsonData::Runtime::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Read);
 
-	auto ObjectName = OUU::Runtime::JsonData::PackageToObjectName(PackagePath);
+	auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(PackagePath);
 	UPackage* NewPackage = CreatePackage(*PackagePath);
 	auto NewDataAsset = NewObject<UJsonDataAsset>(NewPackage, AssetClass, *ObjectName, RF_Public | RF_Standalone);
 

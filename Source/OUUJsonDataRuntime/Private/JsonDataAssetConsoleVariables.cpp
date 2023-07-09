@@ -5,7 +5,7 @@
 #include "JsonDataAssetGlobals.h"
 #include "JsonDataAssetSubsystem.h"
 
-namespace OUU::Runtime::JsonData::Private
+namespace OUU::JsonData::Runtime::Private
 {
 	// Bool switches
 	TAutoConsoleVariable<bool> CVar_SeparateSourceMountRoot(
@@ -76,4 +76,4 @@ namespace OUU::Runtime::JsonData::Private
 			}
 			GEngine->GetEngineSubsystem<UJsonDataAssetSubsystem>()->ImportAllAssets(bOnlyMissing);
 		}));
-} // namespace OUU::Runtime::JsonData::Private
+} // namespace OUU::JsonData::Runtime::Private
