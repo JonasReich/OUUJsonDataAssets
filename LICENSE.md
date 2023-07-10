@@ -1,5 +1,5 @@
 
-The Open Unreal Utilities Json Data Assets plugin for Unreal Engine is licensed under the MIT license.
+The OUU Json Data Assets plugin for Unreal Engine is licensed under the MIT license.
 You are invited to create pull-requests to the github source for any additions or modifications you make to the plugin:
 https://github.com/JonasReich/OUUJsonDataAssets
 
