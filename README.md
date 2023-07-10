@@ -12,7 +12,7 @@ including reference search and size map visualization.
 
 ## Limitations
 
-One of the fundamental shortcomings of this plugin is that json assets **cannot be loaded asynchronously!**
+One of the fundamental shortcomings of this plugin is that json assets **cannot be loaded asynchronously or implicitly!**
 
 This can be mostly blamed on the complexity and black-box nature of the existing async asset loading code in the 
 engine. Implementing a single asset load asynchronously is relatively straight forward, but any meaningful loading 
@@ -52,13 +52,13 @@ UJsonDataAsset* DataAsset = Path.LoadSynchronous();
 As you can see, the paths notably lack the following convenience features that you will probably want to have for editable properties and
 asset references in game code:
 
-* Paths do not prevent garbage collection
-* Paths are not statically typed
-* Paths can't implicitly load assets
+- Paths do not prevent garbage collection
+- Paths are not statically typed
 
 To solve this, we offer two types of smart pointers: `TSoftJsonDataAssetPtr<T>` returns correctly downcasted pointers 
-to data asset objects, while retaining the same loading and GC behavior. `TJsonDataAssetPtr<T>` expands on this and adds internal hard references to the generated objects to prevent garbage collection when used in UPROPERTIES and
-implicit load calls when (net)loading.
+to data asset objects, while retaining the same loading and GC behavior.
+`TJsonDataAssetPtr<T>` expands on this and adds internal hard references to the generated objects to prevent garbage collection when used in UPROPERTIES.
+Even these paths **do not load assets implicitly** though, but only at the time of accessing the pointer!
 
 ```c++
 auto BarPath = FJsonDataAssetPath::FromPackagePath("/JsonData/Some/Folder/Bar");

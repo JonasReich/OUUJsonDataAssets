@@ -92,7 +92,7 @@ bool FSoftJsonDataAssetPtr::Serialize(FStructuredArchive::FSlot Slot)
 //---------------------------------------------------------------------------------------------------------------------
 
 FJsonDataAssetPtr::FJsonDataAssetPtr(FJsonDataAssetPath InPath) :
-	Path(MoveTemp(InPath)), HardReference(Path.LoadSynchronous())
+	Path(MoveTemp(InPath)), HardReference(Path.ResolveObject())
 {
 }
 
@@ -112,7 +112,7 @@ bool FJsonDataAssetPtr::ImportTextItem(const TCHAR*& Buffer, int32 PortFlags, UO
 {
 	if (Path.ImportTextItem(Buffer, PortFlags, Parent, ErrorText))
 	{
-		HardReference = Path.LoadSynchronous();
+		HardReference = Path.ResolveObject();
 		return true;
 	}
 
