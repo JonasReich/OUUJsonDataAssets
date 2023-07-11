@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "Misc/AutomationTest.h"
+
 /**
  * Shorthands for calling test functions for use in specs.
  *

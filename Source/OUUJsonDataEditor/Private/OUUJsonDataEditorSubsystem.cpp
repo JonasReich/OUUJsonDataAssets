@@ -4,6 +4,9 @@
 
 #include "JsonDataAsset.h"
 #include "JsonDataAssetPathDetailsCustomization.h"
+#include "Modules/ModuleManager.h"
+#include "PropertyEditorDelegates.h"
+#include "PropertyEditorModule.h"
 #include "UObject/UObjectIterator.h"
 
 void UOUUJsonDataEditorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
