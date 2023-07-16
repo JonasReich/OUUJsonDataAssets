@@ -1,6 +1,8 @@
 
 # Open Unreal Utilities - JSON Data Assets
 
+![OUU JSON Data Assets logo](./Resources/ouj_wide.png)
+
 This plugin adds a new data asset type to Unreal Engine that allows asset serialization to JSON text files.
 
 The plugin allows both creating assets in editor, as well as dynamic loading of asset data at runtime, making it a potential 
