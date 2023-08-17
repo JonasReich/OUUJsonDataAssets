@@ -587,7 +587,8 @@ struct FJsonLibraryExportHelper
 	template <
 		bool bPrettyPrint,
 		class PrintPolicy =
-			TConditionalType<bPrettyPrint, TPrettyJsonPrintPolicy<TCHAR>, TCondensedJsonPrintPolicy<TCHAR>>::Type>
+			typename TConditionalType<bPrettyPrint, TPrettyJsonPrintPolicy<TCHAR>, TCondensedJsonPrintPolicy<TCHAR>>::
+				Type>
 	bool UStructToJsonObjectStringInternal(const TSharedRef<FJsonObject>& JsonObject, FString& OutJsonString)
 	{
 		constexpr int32 Indent = 4;
