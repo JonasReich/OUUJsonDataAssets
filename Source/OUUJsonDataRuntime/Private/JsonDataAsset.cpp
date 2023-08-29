@@ -154,7 +154,7 @@ bool UJsonDataAsset::ImportJson(TSharedPtr<FJsonObject> JsonObject, bool bCheckC
 		UEngine::CopyPropertiesForUnrelatedObjects(CDO, this, Options);
 	}
 
-	if (!FJsonObjectConverter::JsonObjectToUStruct(Data.ToSharedRef(), GetClass(), this, 0, 0))
+	if (!UOUUJsonLibrary::JsonObjectToUStruct(Data.ToSharedRef(), GetClass(), this, 0, 0))
 	{
 		UE_JSON_DATA_MESSAGELOG(Error, this, TEXT("Failed to import json 'Data' field into UObject properties"));
 		return false;

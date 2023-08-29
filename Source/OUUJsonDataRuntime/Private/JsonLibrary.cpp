@@ -27,7 +27,12 @@ namespace OUU::JsonData::Runtime::Private
 	// The string to return from invalid conversion results.
 	const FString InvalidConversionResultString = TEXT("");
 
+	// Use the same name as FJsonObjectConverter to have compatible exports!
+	const FString ObjectClassNameKey = "_ClassName";
+	const FName NAME_DateTime(TEXT("DateTime"));
+
 } // namespace OUU::JsonData::Runtime::Private
+using namespace OUU::JsonData::Runtime::Private;
 
 // Use this to bubble information about change status / skip status through the hierarchy.
 struct FOUUPropertyJsonResult
@@ -73,9 +78,6 @@ struct FJsonLibraryExportHelper
 		CustomCB.BindRaw(this, &FJsonLibraryExportHelper::ObjectJsonCallback);
 		return CustomCB;
 	}
-
-	// Use the same name as FJsonObjectConverter to have compatible exports!
-	const FString ObjectClassNameKey = "_ClassName";
 
 	bool SkipPropertyMatchingDefaultValues(FProperty* Property, const void* Value, const void* DefaultValue) const
 	{
@@ -620,6 +622,1091 @@ struct FJsonLibraryExportHelper
 	}
 };
 
+struct FJsonLibraryImportHelper
+{
+	// clang-format off
+	bool JsonValueToFPropertyWithContainer(const TSharedPtr<FJsonValue>& JsonValue, FProperty* Property, void* OutValue, const UStruct* ContainerStruct, void* Container, int64 CheckFlags, int64 SkipFlags, const bool bStrictMode, FText* OutFailReason);
+	bool JsonAttributesToUStructWithContainer(const TMap< FString, TSharedPtr<FJsonValue> >& JsonAttributes, const UStruct* StructDefinition, void* OutStruct, const UStruct* ContainerStruct, void* Container, int64 CheckFlags, int64 SkipFlags, const bool bStrictMode, FText* OutFailReason);
+	// clang-format on
+
+	bool JsonValueToUProperty(
+		const TSharedPtr<FJsonValue>& JsonValue,
+		FProperty* Property,
+		void* OutValue,
+		int64 CheckFlags,
+		int64 SkipFlags,
+		const bool bStrictMode = false,
+		FText* OutFailReason = nullptr)
+	{
+		return JsonValueToFPropertyWithContainer(
+			JsonValue,
+			Property,
+			OutValue,
+			nullptr,
+			nullptr,
+			CheckFlags,
+			SkipFlags,
+			bStrictMode,
+			OutFailReason);
+	}
+
+	bool JsonObjectToUStruct(
+		const TSharedRef<FJsonObject>& JsonObject,
+		const UStruct* StructDefinition,
+		void* OutStruct,
+		int64 CheckFlags,
+		int64 SkipFlags,
+		const bool bStrictMode = false,
+		FText* OutFailReason = nullptr)
+	{
+		return JsonAttributesToUStruct(
+			JsonObject->Values,
+			StructDefinition,
+			OutStruct,
+			CheckFlags,
+			SkipFlags,
+			bStrictMode,
+			OutFailReason);
+	}
+
+	bool JsonAttributesToUStruct(
+		const TMap<FString, TSharedPtr<FJsonValue>>& JsonAttributes,
+		const UStruct* StructDefinition,
+		void* OutStruct,
+		int64 CheckFlags,
+		int64 SkipFlags,
+		const bool bStrictMode = false,
+		FText* OutFailReason = nullptr)
+	{
+		return JsonAttributesToUStructWithContainer(
+			JsonAttributes,
+			StructDefinition,
+			OutStruct,
+			StructDefinition,
+			OutStruct,
+			CheckFlags,
+			SkipFlags,
+			bStrictMode,
+			OutFailReason);
+	}
+
+	/** Convert JSON to property, assuming either the property is not an array or the value is an individual array
+	 * element */
+	bool ConvertScalarJsonValueToFPropertyWithContainer(
+		const TSharedPtr<FJsonValue>& JsonValue,
+		FProperty* Property,
+		void* OutValue,
+		const UStruct* ContainerStruct,
+		void* Container,
+		int64 CheckFlags,
+		int64 SkipFlags,
+		const bool bStrictMode,
+		FText* OutFailReason)
+	{
+		if (FEnumProperty* EnumProperty = CastField<FEnumProperty>(Property))
+		{
+			if (JsonValue->Type == EJson::String)
+			{
+				// see if we were passed a string for the enum
+				const UEnum* Enum = EnumProperty->GetEnum();
+				check(Enum);
+				FString StrValue = JsonValue->AsString();
+				int64 IntValue = Enum->GetValueByName(FName(*StrValue), EGetByNameFlags::CheckAuthoredName);
+				if (IntValue == INDEX_NONE)
+				{
+					UE_LOG(
+						LogJsonDataAsset,
+						Error,
+						TEXT("JsonValueToUProperty - Unable to import enum %s from string value %s for property %s"),
+						*Enum->CppType,
+						*StrValue,
+						*Property->GetAuthoredName());
+					if (OutFailReason)
+					{
+						*OutFailReason = FText::Format(
+							INVTEXT("Unable to import enum {0} from string value {1} for property {2}"),
+							FText::FromString(Enum->CppType),
+							FText::FromString(StrValue),
+							FText::FromString(Property->GetAuthoredName()));
+					}
+					return false;
+				}
+				EnumProperty->GetUnderlyingProperty()->SetIntPropertyValue(OutValue, IntValue);
+			}
+			else
+			{
+				// AsNumber will log an error for completely inappropriate types (then give us a default)
+				EnumProperty->GetUnderlyingProperty()->SetIntPropertyValue(OutValue, (int64)JsonValue->AsNumber());
+			}
+		}
+		else if (FNumericProperty* NumericProperty = CastField<FNumericProperty>(Property))
+		{
+			if (NumericProperty->IsEnum() && JsonValue->Type == EJson::String)
+			{
+				// see if we were passed a string for the enum
+				const UEnum* Enum = NumericProperty->GetIntPropertyEnum();
+				check(Enum); // should be assured by IsEnum()
+				FString StrValue = JsonValue->AsString();
+				int64 IntValue = Enum->GetValueByName(FName(*StrValue), EGetByNameFlags::CheckAuthoredName);
+				if (IntValue == INDEX_NONE)
+				{
+					UE_LOG(
+						LogJsonDataAsset,
+						Error,
+						TEXT("JsonValueToUProperty - Unable to import enum %s from numeric value %s for property %s"),
+						*Enum->CppType,
+						*StrValue,
+						*Property->GetAuthoredName());
+					if (OutFailReason)
+					{
+						*OutFailReason = FText::Format(
+							INVTEXT("Unable to import enum {0} from numeric value {1} for property {2}"),
+							FText::FromString(Enum->CppType),
+							FText::FromString(StrValue),
+							FText::FromString(Property->GetAuthoredName()));
+					}
+					return false;
+				}
+				NumericProperty->SetIntPropertyValue(OutValue, IntValue);
+			}
+			else if (NumericProperty->IsFloatingPoint())
+			{
+				// AsNumber will log an error for completely inappropriate types (then give us a default)
+				NumericProperty->SetFloatingPointPropertyValue(OutValue, JsonValue->AsNumber());
+			}
+			else if (NumericProperty->IsInteger())
+			{
+				if (JsonValue->Type == EJson::String)
+				{
+					// parse string -> int64 ourselves so we don't lose any precision going through AsNumber (aka
+					// double)
+					NumericProperty->SetIntPropertyValue(OutValue, FCString::Atoi64(*JsonValue->AsString()));
+				}
+				else
+				{
+					// AsNumber will log an error for completely inappropriate types (then give us a default)
+					NumericProperty->SetIntPropertyValue(OutValue, (int64)JsonValue->AsNumber());
+				}
+			}
+			else
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Error,
+					TEXT("JsonValueToUProperty - Unable to import json value into %s numeric property %s"),
+					*Property->GetClass()->GetName(),
+					*Property->GetAuthoredName());
+				if (OutFailReason)
+				{
+					*OutFailReason = FText::Format(
+						INVTEXT("Unable to import json value into {0} numeric property {1}"),
+						FText::FromString(Property->GetClass()->GetName()),
+						FText::FromString(Property->GetAuthoredName()));
+				}
+				return false;
+			}
+		}
+		else if (FBoolProperty* BoolProperty = CastField<FBoolProperty>(Property))
+		{
+			// AsBool will log an error for completely inappropriate types (then give us a default)
+			BoolProperty->SetPropertyValue(OutValue, JsonValue->AsBool());
+		}
+		else if (FStrProperty* StringProperty = CastField<FStrProperty>(Property))
+		{
+			// AsString will log an error for completely inappropriate types (then give us a default)
+			StringProperty->SetPropertyValue(OutValue, JsonValue->AsString());
+		}
+		else if (FArrayProperty* ArrayProperty = CastField<FArrayProperty>(Property))
+		{
+			if (JsonValue->Type == EJson::Array)
+			{
+				TArray<TSharedPtr<FJsonValue>> ArrayValue = JsonValue->AsArray();
+				int32 ArrLen = ArrayValue.Num();
+
+				// make the output array size match
+				FScriptArrayHelper Helper(ArrayProperty, OutValue);
+				Helper.Resize(ArrLen);
+
+				// set the property values
+				for (int32 i = 0; i < ArrLen; ++i)
+				{
+					const TSharedPtr<FJsonValue>& ArrayValueItem = ArrayValue[i];
+					if (ArrayValueItem.IsValid() && !ArrayValueItem->IsNull())
+					{
+						if (!JsonValueToFPropertyWithContainer(
+								ArrayValueItem,
+								ArrayProperty->Inner,
+								Helper.GetRawPtr(i),
+								ContainerStruct,
+								Container,
+								CheckFlags & (~CPF_ParmFlags),
+								SkipFlags,
+								bStrictMode,
+								OutFailReason))
+						{
+							UE_LOG(
+								LogJsonDataAsset,
+								Error,
+								TEXT("JsonValueToUProperty - Unable to import Array element %d for property %s"),
+								i,
+								*Property->GetAuthoredName());
+							if (OutFailReason)
+							{
+								*OutFailReason = FText::Format(
+									INVTEXT("Unable to import Array element {0} for property {1}\n{2}"),
+									FText::AsNumber(i),
+									FText::FromString(Property->GetAuthoredName()),
+									*OutFailReason);
+							}
+							return false;
+						}
+					}
+				}
+			}
+			else
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Error,
+					TEXT("JsonValueToUProperty - Unable to import non-array JSON value into Array property %s"),
+					*Property->GetAuthoredName());
+				if (OutFailReason)
+				{
+					*OutFailReason = FText::Format(
+						INVTEXT("Unable to import non-array JSON value into Array property {0}"),
+						FText::FromString(Property->GetAuthoredName()));
+				}
+				return false;
+			}
+		}
+		else if (FMapProperty* MapProperty = CastField<FMapProperty>(Property))
+		{
+			if (JsonValue->Type == EJson::Object)
+			{
+				TSharedPtr<FJsonObject> ObjectValue = JsonValue->AsObject();
+
+				FScriptMapHelper Helper(MapProperty, OutValue);
+
+				check(ObjectValue);
+
+				int32 MapSize = ObjectValue->Values.Num();
+				Helper.EmptyValues(MapSize);
+
+				// set the property values
+				for (const auto& Entry : ObjectValue->Values)
+				{
+					if (Entry.Value.IsValid() && !Entry.Value->IsNull())
+					{
+						int32 NewIndex = Helper.AddDefaultValue_Invalid_NeedsRehash();
+
+						TSharedPtr<FJsonValueString> TempKeyValue = MakeShared<FJsonValueString>(Entry.Key);
+
+						if (!JsonValueToFPropertyWithContainer(
+								TempKeyValue,
+								MapProperty->KeyProp,
+								Helper.GetKeyPtr(NewIndex),
+								ContainerStruct,
+								Container,
+								CheckFlags & (~CPF_ParmFlags),
+								SkipFlags,
+								bStrictMode,
+								OutFailReason))
+						{
+							UE_LOG(
+								LogJsonDataAsset,
+								Error,
+								TEXT("JsonValueToUProperty - Unable to import Map element %s key for property %s"),
+								*Entry.Key,
+								*Property->GetAuthoredName());
+							if (OutFailReason)
+							{
+								*OutFailReason = FText::Format(
+									INVTEXT("Unable to import Map element {0} key for property {1}\n{2}"),
+									FText::FromString(Entry.Key),
+									FText::FromString(Property->GetAuthoredName()),
+									*OutFailReason);
+							}
+							return false;
+						}
+
+						if (!JsonValueToFPropertyWithContainer(
+								Entry.Value,
+								MapProperty->ValueProp,
+								Helper.GetValuePtr(NewIndex),
+								ContainerStruct,
+								Container,
+								CheckFlags & (~CPF_ParmFlags),
+								SkipFlags,
+								bStrictMode,
+								OutFailReason))
+						{
+							UE_LOG(
+								LogJsonDataAsset,
+								Error,
+								TEXT("JsonValueToUProperty - Unable to import Map element %s value for property %s"),
+								*Entry.Key,
+								*Property->GetAuthoredName());
+							if (OutFailReason)
+							{
+								*OutFailReason = FText::Format(
+									INVTEXT("Unable to import Map element {0} value for property {1}\n{2}"),
+									FText::FromString(Entry.Key),
+									FText::FromString(Property->GetAuthoredName()),
+									*OutFailReason);
+							}
+							return false;
+						}
+					}
+				}
+
+				Helper.Rehash();
+			}
+			else
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Error,
+					TEXT("JsonValueToUProperty - Unable to import non-object JSON value into Map property %s"),
+					*Property->GetAuthoredName());
+				if (OutFailReason)
+				{
+					*OutFailReason = FText::Format(
+						INVTEXT("Unable to import non-object JSON value into Map property {0}"),
+						FText::FromString(Property->GetAuthoredName()));
+				}
+				return false;
+			}
+		}
+		else if (FSetProperty* SetProperty = CastField<FSetProperty>(Property))
+		{
+			if (JsonValue->Type == EJson::Array)
+			{
+				TArray<TSharedPtr<FJsonValue>> ArrayValue = JsonValue->AsArray();
+				int32 ArrLen = ArrayValue.Num();
+
+				FScriptSetHelper Helper(SetProperty, OutValue);
+				Helper.EmptyElements(ArrLen);
+
+				// set the property values
+				for (int32 i = 0; i < ArrLen; ++i)
+				{
+					const TSharedPtr<FJsonValue>& ArrayValueItem = ArrayValue[i];
+					if (ArrayValueItem.IsValid() && !ArrayValueItem->IsNull())
+					{
+						int32 NewIndex = Helper.AddDefaultValue_Invalid_NeedsRehash();
+						if (!JsonValueToFPropertyWithContainer(
+								ArrayValueItem,
+								SetProperty->ElementProp,
+								Helper.GetElementPtr(NewIndex),
+								ContainerStruct,
+								Container,
+								CheckFlags & (~CPF_ParmFlags),
+								SkipFlags,
+								bStrictMode,
+								OutFailReason))
+						{
+							UE_LOG(
+								LogJsonDataAsset,
+								Error,
+								TEXT("JsonValueToUProperty - Unable to import Set element %d for property %s"),
+								i,
+								*Property->GetAuthoredName());
+							if (OutFailReason)
+							{
+								*OutFailReason = FText::Format(
+									INVTEXT("Unable to import Set element {0} for property {1}\n{2}"),
+									FText::AsNumber(i),
+									FText::FromString(Property->GetAuthoredName()),
+									*OutFailReason);
+							}
+							return false;
+						}
+					}
+				}
+
+				Helper.Rehash();
+			}
+			else
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Error,
+					TEXT("JsonValueToUProperty - Unable to import non-array JSON value into Set property %s"),
+					*Property->GetAuthoredName());
+				if (OutFailReason)
+				{
+					*OutFailReason = FText::Format(
+						INVTEXT("Unable to import non-array JSON value into Set property {0}"),
+						FText::FromString(Property->GetAuthoredName()));
+				}
+				return false;
+			}
+		}
+		else if (FTextProperty* TextProperty = CastField<FTextProperty>(Property))
+		{
+			if (JsonValue->Type == EJson::String)
+			{
+				// assume this string is already localized, so import as invariant
+				TextProperty->SetPropertyValue(OutValue, FText::FromString(JsonValue->AsString()));
+			}
+			else if (JsonValue->Type == EJson::Object)
+			{
+				TSharedPtr<FJsonObject> Obj = JsonValue->AsObject();
+				check(Obj.IsValid()); // should not fail if Type == EJson::Object
+
+				// import the subvalue as a culture invariant string
+				FText Text;
+				if (!FJsonObjectConverter::GetTextFromObject(Obj.ToSharedRef(), Text))
+				{
+					UE_LOG(
+						LogJsonDataAsset,
+						Error,
+						TEXT("JsonValueToUProperty - Unable to import JSON object with invalid keys into Text property "
+							 "%s"),
+						*Property->GetAuthoredName());
+					if (OutFailReason)
+					{
+						*OutFailReason = FText::Format(
+							INVTEXT("Unable to import JSON object with invalid keys into Text property {0}"),
+							FText::FromString(Property->GetAuthoredName()));
+					}
+					return false;
+				}
+				TextProperty->SetPropertyValue(OutValue, Text);
+			}
+			else
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Error,
+					TEXT("JsonValueToUProperty - Unable to import JSON value that is neither string nor object into "
+						 "Text property %s"),
+					*Property->GetAuthoredName());
+				if (OutFailReason)
+				{
+					*OutFailReason = FText::Format(
+						INVTEXT("Unable to import JSON value that is neither string nor object into Text property {0}"),
+						FText::FromString(Property->GetAuthoredName()));
+				}
+				return false;
+			}
+		}
+		else if (FStructProperty* StructProperty = CastField<FStructProperty>(Property))
+		{
+			if (JsonValue->Type == EJson::Object)
+			{
+				TSharedPtr<FJsonObject> Obj = JsonValue->AsObject();
+				check(Obj.IsValid()); // should not fail if Type == EJson::Object
+				if (!JsonAttributesToUStructWithContainer(
+						Obj->Values,
+						StructProperty->Struct,
+						OutValue,
+						ContainerStruct,
+						Container,
+						CheckFlags & (~CPF_ParmFlags),
+						SkipFlags,
+						bStrictMode,
+						OutFailReason))
+				{
+					UE_LOG(
+						LogJsonDataAsset,
+						Error,
+						TEXT("JsonValueToUProperty - Unable to import JSON object into %s property %s"),
+						*StructProperty->Struct->GetAuthoredName(),
+						*Property->GetAuthoredName());
+					if (OutFailReason)
+					{
+						*OutFailReason = FText::Format(
+							INVTEXT("Unable to import JSON object into {0} property {1}\n{2}"),
+							FText::FromString(StructProperty->Struct->GetAuthoredName()),
+							FText::FromString(Property->GetAuthoredName()),
+							*OutFailReason);
+					}
+					return false;
+				}
+			}
+			else if (JsonValue->Type == EJson::String && StructProperty->Struct->GetFName() == NAME_LinearColor)
+			{
+				FLinearColor& ColorOut = *(FLinearColor*)OutValue;
+				FString ColorString = JsonValue->AsString();
+
+				FColor IntermediateColor;
+				IntermediateColor = FColor::FromHex(ColorString);
+
+				ColorOut = IntermediateColor;
+			}
+			else if (JsonValue->Type == EJson::String && StructProperty->Struct->GetFName() == NAME_Color)
+			{
+				FColor& ColorOut = *(FColor*)OutValue;
+				FString ColorString = JsonValue->AsString();
+
+				ColorOut = FColor::FromHex(ColorString);
+			}
+			else if (JsonValue->Type == EJson::String && StructProperty->Struct->GetFName() == NAME_DateTime)
+			{
+				FString DateString = JsonValue->AsString();
+				FDateTime& DateTimeOut = *(FDateTime*)OutValue;
+				if (DateString == TEXT("min"))
+				{
+					// min representable value for our date struct. Actual date may vary by platform (this is used for
+					// sorting)
+					DateTimeOut = FDateTime::MinValue();
+				}
+				else if (DateString == TEXT("max"))
+				{
+					// max representable value for our date struct. Actual date may vary by platform (this is used for
+					// sorting)
+					DateTimeOut = FDateTime::MaxValue();
+				}
+				else if (DateString == TEXT("now"))
+				{
+					// this value's not really meaningful from JSON serialization (since we don't know timezone) but
+					// handle it anyway since we're handling the other keywords
+					DateTimeOut = FDateTime::UtcNow();
+				}
+				else if (FDateTime::ParseIso8601(*DateString, DateTimeOut))
+				{
+					// ok
+				}
+				else if (FDateTime::Parse(DateString, DateTimeOut))
+				{
+					// ok
+				}
+				else
+				{
+					UE_LOG(
+						LogJsonDataAsset,
+						Error,
+						TEXT("JsonValueToUProperty - Unable to import JSON string into DateTime property %s"),
+						*Property->GetAuthoredName());
+					if (OutFailReason)
+					{
+						*OutFailReason = FText::Format(
+							INVTEXT("Unable to import JSON string into DateTime property {0}"),
+							FText::FromString(Property->GetAuthoredName()));
+					}
+					return false;
+				}
+			}
+			else if (
+				JsonValue->Type == EJson::String && StructProperty->Struct->GetCppStructOps()
+				&& StructProperty->Struct->GetCppStructOps()->HasImportTextItem())
+			{
+				UScriptStruct::ICppStructOps* TheCppStructOps = StructProperty->Struct->GetCppStructOps();
+
+				FString ImportTextString = JsonValue->AsString();
+				const TCHAR* ImportTextPtr = *ImportTextString;
+				if (!TheCppStructOps->ImportTextItem(ImportTextPtr, OutValue, PPF_None, nullptr, (FOutputDevice*)GWarn))
+				{
+					// Fall back to trying the tagged property approach if custom ImportTextItem couldn't get it done
+					if (Property->ImportText_Direct(ImportTextPtr, OutValue, nullptr, PPF_None) == nullptr)
+					{
+						UE_LOG(
+							LogJsonDataAsset,
+							Error,
+							TEXT("JsonValueToUProperty - Unable to import JSON string into %s property %s"),
+							*StructProperty->Struct->GetAuthoredName(),
+							*Property->GetAuthoredName());
+						if (OutFailReason)
+						{
+							*OutFailReason = FText::Format(
+								INVTEXT("Unable to import JSON string into {0} property {1}"),
+								FText::FromString(StructProperty->Struct->GetAuthoredName()),
+								FText::FromString(Property->GetAuthoredName()));
+						}
+						return false;
+					}
+				}
+			}
+			else if (JsonValue->Type == EJson::String)
+			{
+				FString ImportTextString = JsonValue->AsString();
+				const TCHAR* ImportTextPtr = *ImportTextString;
+				if (Property->ImportText_Direct(ImportTextPtr, OutValue, nullptr, PPF_None) == nullptr)
+				{
+					UE_LOG(
+						LogJsonDataAsset,
+						Error,
+						TEXT("JsonValueToUProperty - Unable to import JSON string into %s property %s"),
+						*StructProperty->Struct->GetAuthoredName(),
+						*Property->GetAuthoredName());
+					if (OutFailReason)
+					{
+						*OutFailReason = FText::Format(
+							INVTEXT("Unable to import JSON string into {0} property {1}"),
+							FText::FromString(StructProperty->Struct->GetAuthoredName()),
+							FText::FromString(Property->GetAuthoredName()));
+					}
+					return false;
+				}
+			}
+			else
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Error,
+					TEXT("JsonValueToUProperty - Unable to import JSON value that is neither string nor object into %s "
+						 "property %s"),
+					*StructProperty->Struct->GetAuthoredName(),
+					*Property->GetAuthoredName());
+				if (OutFailReason)
+				{
+					*OutFailReason = FText::Format(
+						INVTEXT("Unable to import JSON value that is neither string nor object into {0} property {1}"),
+						FText::FromString(StructProperty->Struct->GetAuthoredName()),
+						FText::FromString(Property->GetAuthoredName()));
+				}
+				return false;
+			}
+		}
+		else if (FObjectProperty* ObjectProperty = CastField<FObjectProperty>(Property))
+		{
+			if (JsonValue->Type == EJson::Object)
+			{
+				UObject* Outer = GetTransientPackage();
+				if (ContainerStruct->IsChildOf(UObject::StaticClass()))
+				{
+					Outer = (UObject*)Container;
+				}
+
+				TSharedPtr<FJsonObject> Obj = JsonValue->AsObject();
+				UClass* PropertyClass = ObjectProperty->PropertyClass;
+
+				// If a specific subclass was stored in the JSON, use that instead of the PropertyClass
+				FString ClassString = Obj->GetStringField(ObjectClassNameKey);
+				Obj->RemoveField(ObjectClassNameKey);
+				if (!ClassString.IsEmpty())
+				{
+					UClass* FoundClass = FPackageName::IsShortPackageName(ClassString)
+						? FindFirstObject<UClass>(*ClassString)
+						: UClass::TryFindTypeSlow<UClass>(ClassString);
+					if (FoundClass)
+					{
+						PropertyClass = FoundClass;
+
+						// GRIMLORE Start dlehn: If stored class does not match expected class, make sure to create the
+						// correct type
+						if (PropertyClass->IsChildOf(ObjectProperty->PropertyClass) == false
+							|| PropertyClass->HasAnyClassFlags(CLASS_Abstract))
+						{
+							UE_LOG(
+								LogJsonDataAsset,
+								Warning,
+								TEXT("JsonValueToUProperty - JSON object class %s saved in property %s on object %s is "
+									 "not valid for a property of type %s. "
+									 "Will try to load as default class instead."),
+								*PropertyClass->GetAuthoredName(),
+								*Property->GetAuthoredName(),
+								*Outer->GetPathName(),
+								*ObjectProperty->PropertyClass->GetAuthoredName());
+
+							PropertyClass = ObjectProperty->PropertyClass;
+						}
+					}
+					else
+					{
+						UE_LOG(
+							LogJsonDataAsset,
+							Warning,
+							TEXT("JsonValueToUProperty - JSON object class %s saved in property %s on object %s does "
+								 "not exist. "
+								 "Will try to load as default class instead."),
+							*ClassString,
+							*Property->GetAuthoredName(),
+							*Outer->GetPathName(),
+							*ObjectProperty->PropertyClass->GetAuthoredName());
+						// GRIMLORE End
+					}
+				}
+
+				// GRIMLORE Start dlehn: Property class may not be valid, so we will not create an object.
+				if (PropertyClass->HasAnyClassFlags(CLASS_Abstract))
+				{
+					UE_LOG(
+						LogJsonDataAsset,
+						Error,
+						TEXT("JsonValueToUProperty - Unable to import JSON object of class %s into property %s on "
+							 "object %s because the class is abstract."),
+						*PropertyClass->GetAuthoredName(),
+						*Property->GetAuthoredName(),
+						*Outer->GetPathName());
+					if (OutFailReason)
+					{
+						*OutFailReason = FText::Format(
+							INVTEXT("Unable to import JSON object of class {0} into property {1} because the class is "
+									"abstract.\n{2}"),
+							FText::FromString(PropertyClass->GetAuthoredName()),
+							FText::FromString(Property->GetAuthoredName()),
+							*OutFailReason);
+					}
+
+					ObjectProperty->SetObjectPropertyValue(OutValue, nullptr);
+
+					// We cannot return false here, otherwise loading of the object will be cancelled entirely.
+					return true;
+				}
+				// GRIMLORE End
+
+				UObject* createdObj = StaticAllocateObject(
+					PropertyClass,
+					Outer,
+					NAME_None,
+					EObjectFlags::RF_NoFlags,
+					EInternalObjectFlags::None,
+					false);
+				(*PropertyClass->ClassConstructor)(
+					FObjectInitializer(createdObj, PropertyClass->ClassDefaultObject, EObjectInitializerOptions::None));
+
+				ObjectProperty->SetObjectPropertyValue(OutValue, createdObj);
+
+				check(Obj.IsValid()); // should not fail if Type == EJson::Object
+				if (!JsonAttributesToUStructWithContainer(
+						Obj->Values,
+						PropertyClass,
+						createdObj,
+						PropertyClass,
+						createdObj,
+						CheckFlags & (~CPF_ParmFlags),
+						SkipFlags,
+						bStrictMode,
+						OutFailReason))
+				{
+					UE_LOG(
+						LogJsonDataAsset,
+						Error,
+						TEXT("JsonValueToUProperty - Unable to import JSON object into %s property %s"),
+						*PropertyClass->GetAuthoredName(),
+						*Property->GetAuthoredName());
+					if (OutFailReason)
+					{
+						*OutFailReason = FText::Format(
+							INVTEXT("Unable to import JSON object into {0} property {1}\n{2}"),
+							FText::FromString(PropertyClass->GetAuthoredName()),
+							FText::FromString(Property->GetAuthoredName()),
+							*OutFailReason);
+					}
+					return false;
+				}
+			}
+			else if (JsonValue->Type == EJson::String)
+			{
+				// Default to expect a string for everything else
+				if (Property->ImportText_Direct(*JsonValue->AsString(), OutValue, nullptr, 0) == nullptr)
+				{
+					UE_LOG(
+						LogJsonDataAsset,
+						Error,
+						TEXT("JsonValueToUProperty - Unable to import JSON string into %s property %s"),
+						*ObjectProperty->PropertyClass->GetAuthoredName(),
+						*Property->GetAuthoredName());
+					if (OutFailReason)
+					{
+						*OutFailReason = FText::Format(
+							INVTEXT("Unable to import JSON string into {0} property {1}"),
+							FText::FromString(*ObjectProperty->PropertyClass->GetAuthoredName()),
+							FText::FromString(Property->GetAuthoredName()));
+					}
+					return false;
+				}
+
+				// GRIMLORE Start jreich: Fixed hard refs to objects not resolving redirectors when loading
+				while (auto* Redirector = Cast<UObjectRedirector>(ObjectProperty->GetObjectPropertyValue(OutValue)))
+				{
+					ObjectProperty->SetObjectPropertyValue(OutValue, Redirector->DestinationObject);
+				}
+				// GRIMLORE End
+			}
+		}
+		else
+		{
+			// Default to expect a string for everything else
+			if (Property->ImportText_Direct(*JsonValue->AsString(), OutValue, nullptr, 0) == nullptr)
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Error,
+					TEXT("JsonValueToUProperty - Unable to import JSON string into property %s"),
+					*Property->GetAuthoredName());
+				if (OutFailReason)
+				{
+					*OutFailReason = FText::Format(
+						INVTEXT("Unable to import JSON string into property {0}"),
+						FText::FromString(Property->GetAuthoredName()));
+				}
+				return false;
+			}
+		}
+
+		return true;
+	}
+};
+
+bool FJsonLibraryImportHelper::JsonValueToFPropertyWithContainer(
+	const TSharedPtr<FJsonValue>& JsonValue,
+	FProperty* Property,
+	void* OutValue,
+	const UStruct* ContainerStruct,
+	void* Container,
+	int64 CheckFlags,
+	int64 SkipFlags,
+	const bool bStrictMode,
+	FText* OutFailReason)
+{
+	if (!JsonValue.IsValid())
+	{
+		UE_LOG(LogJsonDataAsset, Error, TEXT("JsonValueToUProperty - Invalid JSON value"));
+		if (OutFailReason)
+		{
+			*OutFailReason = INVTEXT("Invalid JSON value");
+		}
+		return false;
+	}
+
+	const bool bArrayOrSetProperty = Property->IsA<FArrayProperty>() || Property->IsA<FSetProperty>();
+	const bool bJsonArray = JsonValue->Type == EJson::Array;
+
+	if (!bJsonArray)
+	{
+		if (bArrayOrSetProperty)
+		{
+			UE_LOG(LogJsonDataAsset, Error, TEXT("JsonValueToUProperty - Expecting JSON array"));
+			if (OutFailReason)
+			{
+				*OutFailReason = INVTEXT("Expecting JSON array");
+			}
+			return false;
+		}
+
+		if (Property->ArrayDim != 1)
+		{
+			if (bStrictMode)
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Error,
+					TEXT("JsonValueToUProperty - Property %s is not an array but has %d elements"),
+					*Property->GetAuthoredName(),
+					Property->ArrayDim);
+				if (OutFailReason)
+				{
+					*OutFailReason = FText::Format(
+						INVTEXT("Property {0} is not an array but has {1} elements"),
+						FText::FromString(Property->GetAuthoredName()),
+						FText::AsNumber(Property->ArrayDim));
+				}
+				return false;
+			}
+
+			UE_LOG(
+				LogJsonDataAsset,
+				Warning,
+				TEXT("Ignoring excess properties when deserializing %s"),
+				*Property->GetAuthoredName());
+		}
+
+		return ConvertScalarJsonValueToFPropertyWithContainer(
+			JsonValue,
+			Property,
+			OutValue,
+			ContainerStruct,
+			Container,
+			CheckFlags,
+			SkipFlags,
+			bStrictMode,
+			OutFailReason);
+	}
+
+	// In practice, the ArrayDim == 1 check ought to be redundant, since nested arrays of FProperties are not
+	// supported
+	if (bArrayOrSetProperty && Property->ArrayDim == 1)
+	{
+		// Read into TArray
+		return ConvertScalarJsonValueToFPropertyWithContainer(
+			JsonValue,
+			Property,
+			OutValue,
+			ContainerStruct,
+			Container,
+			CheckFlags,
+			SkipFlags,
+			bStrictMode,
+			OutFailReason);
+	}
+
+	// We're deserializing a JSON array
+	const auto& ArrayValue = JsonValue->AsArray();
+
+	if (bStrictMode && (Property->ArrayDim != ArrayValue.Num()))
+	{
+		UE_LOG(
+			LogJsonDataAsset,
+			Error,
+			TEXT("JsonValueToUProperty - JSON array size is incorrect (has %d elements, but needs %d)"),
+			ArrayValue.Num(),
+			Property->ArrayDim);
+		if (OutFailReason)
+		{
+			*OutFailReason = FText::Format(
+				INVTEXT("JSON array size is incorrect (has {0} elements, but needs {1})"),
+				FText::AsNumber(ArrayValue.Num()),
+				FText::AsNumber(Property->ArrayDim));
+		}
+		return false;
+	}
+
+	if (Property->ArrayDim < ArrayValue.Num())
+	{
+		UE_LOG(
+			LogJsonDataAsset,
+			Warning,
+			TEXT("Ignoring excess properties when deserializing %s"),
+			*Property->GetAuthoredName());
+	}
+
+	// Read into native array
+	const int32 ItemsToRead = FMath::Clamp(ArrayValue.Num(), 0, Property->ArrayDim);
+	for (int Index = 0; Index != ItemsToRead; ++Index)
+	{
+		if (!ConvertScalarJsonValueToFPropertyWithContainer(
+				ArrayValue[Index],
+				Property,
+				static_cast<char*>(OutValue) + Index * Property->ElementSize,
+				ContainerStruct,
+				Container,
+				CheckFlags,
+				SkipFlags,
+				bStrictMode,
+				OutFailReason))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
+	const TMap<FString, TSharedPtr<FJsonValue>>& JsonAttributes,
+	const UStruct* StructDefinition,
+	void* OutStruct,
+	const UStruct* ContainerStruct,
+	void* Container,
+	int64 CheckFlags,
+	int64 SkipFlags,
+	const bool bStrictMode,
+	FText* OutFailReason)
+{
+	if (StructDefinition == FJsonObjectWrapper::StaticStruct())
+	{
+		// Just copy it into the object
+		FJsonObjectWrapper* ProxyObject = (FJsonObjectWrapper*)OutStruct;
+		ProxyObject->JsonObject = MakeShared<FJsonObject>();
+		ProxyObject->JsonObject->Values = JsonAttributes;
+		return true;
+	}
+
+	int32 NumUnclaimedProperties = JsonAttributes.Num();
+	if (NumUnclaimedProperties <= 0)
+	{
+		return true;
+	}
+
+	// iterate over the struct properties
+	for (TFieldIterator<FProperty> PropIt(StructDefinition); PropIt; ++PropIt)
+	{
+		FProperty* Property = *PropIt;
+
+		// Check to see if we should ignore this property
+		if (CheckFlags != 0 && !Property->HasAnyPropertyFlags(CheckFlags))
+		{
+			continue;
+		}
+		if (Property->HasAnyPropertyFlags(SkipFlags))
+		{
+			continue;
+		}
+
+		// find a JSON value matching this property name
+		FString PropertyName = StructDefinition->GetAuthoredNameForField(Property);
+		const TSharedPtr<FJsonValue>* JsonValue = JsonAttributes.Find(PropertyName);
+
+		if (!JsonValue)
+		{
+			if (bStrictMode)
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Error,
+					TEXT("JsonObjectToUStruct - Missing JSON value named %s"),
+					*PropertyName);
+				if (OutFailReason)
+				{
+					*OutFailReason =
+						FText::Format(INVTEXT("Missing JSON value named {0}"), FText::FromString(PropertyName));
+				}
+				return false;
+			}
+
+			// we allow values to not be found since this mirrors the typical UObject mantra that all the fields are
+			// optional when deserializing
+			continue;
+		}
+
+		if (JsonValue->IsValid() && !(*JsonValue)->IsNull())
+		{
+			void* Value = Property->ContainerPtrToValuePtr<uint8>(OutStruct);
+			if (!JsonValueToFPropertyWithContainer(
+					*JsonValue,
+					Property,
+					Value,
+					ContainerStruct,
+					Container,
+					CheckFlags,
+					SkipFlags,
+					bStrictMode,
+					OutFailReason))
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Error,
+					TEXT("JsonObjectToUStruct - Unable to import JSON value into property %s"),
+					*PropertyName);
+				if (OutFailReason)
+				{
+					*OutFailReason = FText::Format(
+						INVTEXT("Unable to import JSON value into property {0}\n{1}"),
+						FText::FromString(PropertyName),
+						*OutFailReason);
+				}
+				return false;
+			}
+		}
+
+		if (--NumUnclaimedProperties <= 0)
+		{
+			// Should we log a warning/error if we still have properties in the JSON data that aren't in the struct
+			// definition in strict mode?
+
+			// If we found all properties that were in the JsonAttributes map, there is no reason to keep looking
+			// for more.
+			break;
+		}
+	}
+
+	// GRIMLORE Start dlehn: Ensure objects loaded from json receive PostLoad calls
+	if (StructDefinition->IsChildOf<UObject>())
+	{
+		const auto pObject = static_cast<UObject*>(OutStruct);
+		if (pObject->HasAnyFlags(RF_NeedPostLoad) == false)
+		{
+			pObject->SetFlags(RF_NeedPostLoad);
+			pObject->ConditionalPostLoad();
+		}
+	}
+	// GRIMLORE End
+
+	return true;
+}
+
 TSharedPtr<FJsonObject> UOUUJsonLibrary::UStructToJsonObject(
 	const void* Data,
 	const void* DefaultData,
@@ -682,7 +1769,8 @@ bool UOUUJsonLibrary::JsonValueToUProperty(
 	int64 CheckFlags /* = 0 */,
 	int64 SkipFlags /* = 0 */)
 {
-	return FJsonObjectConverter::JsonValueToUProperty(JsonValue, Property, PropertyData, CheckFlags, SkipFlags);
+	FJsonLibraryImportHelper Helper;
+	return Helper.JsonValueToUProperty(JsonValue, Property, PropertyData, CheckFlags, SkipFlags);
 }
 
 FString UOUUJsonLibrary::UObjectToJsonString(
@@ -723,15 +1811,43 @@ bool UOUUJsonLibrary::JsonStringToUObject(
 		UE_LOG(LogJsonDataAsset, Warning, TEXT("JsonStringToUObject - Unable to parse json=[%s]"), *String);
 		return false;
 	}
-	if (!FJsonObjectConverter::JsonObjectToUStruct(
-			JsonObject.ToSharedRef(),
-			Object->GetClass(),
-			Object,
-			CheckFlags,
-			SkipFlags))
+
+	FJsonLibraryImportHelper Helper;
+	if (!Helper.JsonObjectToUStruct(JsonObject.ToSharedRef(), Object->GetClass(), Object, CheckFlags, SkipFlags))
 	{
 		UE_LOG(LogJsonDataAsset, Warning, TEXT("JsonStringToUObject - Unable to deserialize. json=[%s]"), *String);
 		return false;
 	}
 	return true;
+}
+
+bool UOUUJsonLibrary::JsonObjectToUStruct(
+	const TSharedRef<FJsonObject>& JsonObject,
+	const UStruct* StructDefinition,
+	void* OutStruct,
+	int64 CheckFlags /* = 0 */,
+	int64 SkipFlags /* = 0 */)
+{
+	FJsonLibraryImportHelper Helper;
+	if (!Helper.JsonObjectToUStruct(JsonObject, StructDefinition, OutStruct, CheckFlags, SkipFlags))
+	{
+		UE_LOG(LogJsonDataAsset, Warning, TEXT("JsonObjectToUStruct - Unable to deserialize json object."));
+		return false;
+	}
+	return true;
+}
+
+bool UOUUJsonLibrary::JsonObjectToUObject(
+	const TSharedRef<FJsonObject>& JsonObject,
+	UObject* OutObject,
+	int64 CheckFlags /* = 0 */,
+	int64 SkipFlags /* = 0 */)
+{
+	if (!IsValid(OutObject))
+	{
+		UE_LOG(LogJsonDataAsset, Error, TEXT("Failed to convert invalid object FROM Json string"));
+		return false;
+	}
+
+	return JsonObjectToUStruct(JsonObject, OutObject->GetClass(), OutObject, CheckFlags, SkipFlags);
 }

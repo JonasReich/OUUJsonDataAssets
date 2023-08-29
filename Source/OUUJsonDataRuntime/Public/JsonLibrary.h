@@ -83,6 +83,23 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	static bool JsonStringToUObject(UObject* Object, FString String, int64 CheckFlags = 0, int64 SkipFlags = 0);
+
+	/**
+	 * Copy of FJsonObjectConverter::JsonObjectToUStruct that handles object loading more smoothly (e.g. by resolving
+	 * redirectors.)
+	 */
+	static bool JsonObjectToUStruct(
+		const TSharedRef<FJsonObject>& JsonObject,
+		const UStruct* StructDefinition,
+		void* OutStruct,
+		int64 CheckFlags = 0,
+		int64 SkipFlags = 0);
+
+	static bool JsonObjectToUObject(
+		const TSharedRef<FJsonObject>& JsonObject,
+		UObject* OutObject,
+		int64 CheckFlags = 0,
+		int64 SkipFlags = 0);
 };
 
 template <typename StructT>
