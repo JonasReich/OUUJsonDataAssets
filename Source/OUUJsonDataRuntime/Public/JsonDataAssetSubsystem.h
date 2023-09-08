@@ -97,7 +97,7 @@ private:
 	void RegisterMountPoints(const FName& RootName);
 	void UnregisterMountPoints(const FName& RootName);
 
-	void HandleAssetRegistryInitialized();
+	void PostEngineInit();
 
 #if WITH_EDITOR
 	void HandlePreBeginPIE(const bool bIsSimulating);

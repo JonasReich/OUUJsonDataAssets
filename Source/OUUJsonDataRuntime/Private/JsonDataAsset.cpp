@@ -389,7 +389,8 @@ UJsonDataAsset* UJsonDataAsset::LoadJsonDataAsset_Internal(FJsonDataAssetPath Pa
 	else
 	{
 		FString ClassName = JsonObject->GetStringField(TEXT("Class"));
-		auto* pClass = Cast<UClass>(FSoftObjectPath(ClassName).ResolveObject());
+		// Need to use TryLoad() instead of ResolveObject() so blueprint classes can be loaded.
+		auto* pClass = Cast<UClass>(FSoftObjectPath(ClassName).TryLoad());
 		if (!pClass)
 		{
 			UE_JSON_DATA_MESSAGELOG(

@@ -8,7 +8,9 @@
 #include "JsonDataAsset.h"
 #include "JsonDataAssetConsoleVariables.h"
 #include "JsonDataAssetGlobals.h"
+#include "JsonDataCustomVersions.h"
 #include "LogJsonDataAsset.h"
+#include "OUUJsonDataRuntimeVersion.h"
 #include "UObject/SavePackage.h"
 
 #if WITH_EDITOR
@@ -71,10 +73,12 @@ namespace OUU::JsonData::Runtime
 		return UJsonDataAssetSubsystem::Get().GetVirtualRoot(RootName);
 	}
 
+	FString GetCacheDir_DiskFull() { return FPaths::ProjectSavedDir() / TEXT("JsonDataCache"); }
+
 	FString GetCacheMountPointRoot_DiskFull(const FName& RootName)
 	{
 		// Save into Save dir, so the packages are not versioned and can safely be deleted on engine startup.
-		auto Path = FPaths::ProjectSavedDir() / TEXT("JsonDataCache") / RootName.ToString();
+		auto Path = GetCacheDir_DiskFull() / RootName.ToString();
 		return Path;
 	}
 
@@ -185,6 +189,99 @@ namespace OUU::JsonData::Runtime
 #endif
 	}
 
+	// Version marker used to detect if the cache is valid/compatible with the current version.
+	struct FCacheVersion
+	{
+		bool bIsValid = false;
+		FEngineVersion EngineVersion;
+		bool bEngineIsLicenseeVersion;
+		int32 JsonRuntimeVersion = INDEX_NONE;
+
+		static FString GetPathAbs()
+		{
+			return FPaths::Combine(OUU::JsonData::Runtime::GetCacheDir_DiskFull(), "CacheVersion.json");
+		}
+
+		static FCacheVersion Current()
+		{
+			FCacheVersion Result;
+			Result.bIsValid = true;
+			Result.EngineVersion = FEngineVersion::Current();
+			Result.bEngineIsLicenseeVersion = FEngineVersion::Current().IsLicenseeVersion();
+			Result.JsonRuntimeVersion = static_cast<int32>(FOUUJsonDataRuntimeVersion::LatestVersion);
+			return Result;
+		}
+
+		void Write()
+		{
+			auto JsonObject = MakeShared<FJsonObject>();
+			JsonObject->SetStringField(TEXT("EngineVersion"), EngineVersion.ToString());
+			JsonObject->SetBoolField(TEXT("IsLicenseeVersion"), bEngineIsLicenseeVersion);
+			JsonObject->SetNumberField(TEXT("JsonRuntimeVersion"), JsonRuntimeVersion);
+
+			FString JsonString;
+			TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(OUT & JsonString);
+			ensure(FJsonSerializer::Serialize(JsonObject, JsonWriter));
+			ensure(FFileHelper::SaveStringToFile(JsonString, *GetPathAbs()));
+		}
+
+		static FCacheVersion Read()
+		{
+			FCacheVersion Result;
+			const FString FilePath = GetPathAbs();
+
+			// is this sufficient?
+			Result.bIsValid = FPaths::FileExists(*FilePath);
+
+			if (Result.bIsValid == false)
+				return Result;
+
+			FString JsonString;
+			ensure(FFileHelper::LoadFileToString(JsonString, *FilePath));
+			TSharedPtr<FJsonObject> JsonObject;
+			TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(JsonString);
+			ensure(FJsonSerializer::Deserialize(JsonReader, JsonObject) || !JsonObject.IsValid());
+
+			ensure(FEngineVersion::Parse(JsonObject->GetStringField(TEXT("EngineVersion")), OUT Result.EngineVersion));
+			Result.bEngineIsLicenseeVersion = JsonObject->GetBoolField(TEXT("IsLicenseeVersion"));
+			uint32 Changelist = Result.EngineVersion.GetChangelist();
+			Result.EngineVersion.Set(
+				Result.EngineVersion.GetMajor(),
+				Result.EngineVersion.GetMinor(),
+				Result.EngineVersion.GetPatch(),
+				Changelist | (Result.bEngineIsLicenseeVersion ? (1U << 31) : 0),
+				Result.EngineVersion.GetBranch());
+
+			ensure(JsonObject->TryGetNumberField(TEXT("JsonRuntimeVersion"), OUT Result.JsonRuntimeVersion));
+
+			return Result;
+		}
+
+		static bool IsCacheCompatible(const FCacheVersion& New, const FCacheVersion& Old)
+		{
+			// Cache is never considered compatible if either version is invalid
+			if ((Old.bIsValid && New.bIsValid) == false)
+				return false;
+
+			if (New.EngineVersion.IsCompatibleWith(Old.EngineVersion) == false)
+				return false;
+
+			// Consider any mismatch of the json runtime version as a reason to invalidate the cache
+			if (New.JsonRuntimeVersion != Old.JsonRuntimeVersion)
+				return false;
+
+			return true;
+		}
+
+		// If false, the cache is stale and needs to be invalidated in its entirety.
+		static bool IsCacheCompatible()
+		{
+			auto CacheVersion = Read();
+			auto CurrentVersion = Current();
+			return IsCacheCompatible(CurrentVersion, CacheVersion);
+		}
+	};
+
 } // namespace OUU::JsonData::Runtime
 
 void UJsonDataAssetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -209,26 +306,16 @@ void UJsonDataAssetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 	OUU::JsonData::Runtime::CheckJsonPaths();
 
-#if WITH_EDITOR
-	FEditorDelegates::OnPackageDeleted.AddUObject(this, &UJsonDataAssetSubsystem::HandlePackageDeleted);
-	FEditorDelegates::PreBeginPIE.AddUObject(this, &UJsonDataAssetSubsystem::HandlePreBeginPIE);
-#endif
-
 	RegisterMountPoints(OUU::JsonData::Runtime::GameRootName);
-
-	auto& AssetRegistry = *IAssetRegistry::Get();
-	if (AssetRegistry.IsSearchAllAssets() == false || AssetRegistry.IsLoadingAssets())
-	{
-		AssetRegistry.OnFilesLoaded().AddUObject(this, &UJsonDataAssetSubsystem::HandleAssetRegistryInitialized);
-	}
-	else
-	{
-		HandleAssetRegistryInitialized();
-	}
 
 	bAutoExportJson = true;
 
+	FCoreDelegates::OnPostEngineInit.AddUObject(this, &UJsonDataAssetSubsystem::PostEngineInit);
+
 #if WITH_EDITOR
+	FEditorDelegates::OnPackageDeleted.AddUObject(this, &UJsonDataAssetSubsystem::HandlePackageDeleted);
+	FEditorDelegates::PreBeginPIE.AddUObject(this, &UJsonDataAssetSubsystem::HandlePreBeginPIE);
+
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	// I know, disabling deprecation warnings is shit, but this is easy to fix when it eventually breaks.
 	// And having it delegate based is cleaner (and hopefully possible in 5.2) via ModifyCookDelegate,
@@ -244,12 +331,14 @@ void UJsonDataAssetSubsystem::Deinitialize()
 
 	UnregisterMountPoints(OUU::JsonData::Runtime::GameRootName);
 
+	bAutoExportJson = false;
+
+	FCoreDelegates::OnPostEngineInit.RemoveAll(this);
+
 #if WITH_EDITOR
 	FEditorDelegates::OnPackageDeleted.RemoveAll(this);
 	FEditorDelegates::PreBeginPIE.RemoveAll(this);
 #endif
-
-	bAutoExportJson = false;
 }
 
 bool UJsonDataAssetSubsystem::AutoExportJsonEnabled()
@@ -587,6 +676,8 @@ void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyM
 		Error,
 		TEXT("Failed to load %i json data assets"),
 		NumPackagesFailedToLoad);
+
+	OUU::JsonData::Runtime::FCacheVersion::Current().Write();
 }
 
 void UJsonDataAssetSubsystem::AddPluginDataRoot(const FName& PluginName)
@@ -760,7 +851,7 @@ void UJsonDataAssetSubsystem::UnregisterMountPoints(const FName& RootName)
 #endif
 }
 
-void UJsonDataAssetSubsystem::HandleAssetRegistryInitialized()
+void UJsonDataAssetSubsystem::PostEngineInit()
 {
 	RescanAllAssets();
 
@@ -787,8 +878,17 @@ void UJsonDataAssetSubsystem::CleanupAssetCache(const FName& RootName)
 		return;
 	}
 
-	if (OUU::JsonData::Runtime::Private::CVar_PurgeAssetCacheOnStartup.GetValueOnGameThread())
+	const bool bPurgeCVarValue = OUU::JsonData::Runtime::Private::CVar_PurgeAssetCacheOnStartup.GetValueOnGameThread();
+	if (bPurgeCVarValue || (OUU::JsonData::Runtime::FCacheVersion::IsCacheCompatible() == false))
 	{
+		UE_LOG(
+			LogJsonDataAsset,
+			Log,
+			TEXT("Purging the entire json data asset cache. Reason: %s"),
+			*FString(
+				bPurgeCVarValue ? TEXT("Console variable ouu.JsonData.PurgeAssetCacheOnStartup=true")
+								: TEXT("CacheVersion marker is incompatible with current editor binaries")));
+
 		// Delete the directory on-disk before mounting the directory to purge all generated uasset files.
 		PlatformFile.DeleteDirectoryRecursively(*MountDiskPath);
 		return;

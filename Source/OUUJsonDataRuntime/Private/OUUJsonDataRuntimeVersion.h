@@ -16,9 +16,13 @@ public:
 		InitialVersion = 0,
 
 		// This change introduced custom FArchive serialization for json asset paths and smart pointers.
-		// This change does not affect text serialization, so it's not needed for 
+		// This change does not affect text serialization, so it's not needed for
 		// UJsonDataAsset::GetRelevantCustomVersions()
 		AddedJsonDataAssetPathSerialization = InitialVersion,
+
+		// This change introduced cache invalidation based on time stamps and FOUUJsonDataRuntimeVersion.
+		// Any future version introduced here will invalidate the json data cache and lead to a full cache refresh.
+		TimeAndVersionCacheInvalidation,
 
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
