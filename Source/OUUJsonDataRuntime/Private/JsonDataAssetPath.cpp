@@ -169,7 +169,7 @@ bool FJsonDataAssetPath::Serialize(FArchive& Ar)
 	{
 		FSoftObjectPath ActualPath = Path.ToSoftObjectPath();
 
-		if (Ar.IsSaving())
+		if (Ar.IsLoading() == false)
 		{
 			// To fixup redirectors - not ideal, but get's the job done
 			if (auto* ActualObject = Path.Get())
