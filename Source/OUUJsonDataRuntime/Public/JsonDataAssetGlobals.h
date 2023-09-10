@@ -26,6 +26,7 @@ namespace OUU::JsonData::Runtime
 	// Mount point for generated packages.
 	// Save into Save dir, so the packages are not versioned and can safely be deleted on engine startup.
 	OUUJSONDATARUNTIME_API FString GetCacheMountPointRoot_Package(const FName& RootName);
+	OUUJSONDATARUNTIME_API FString GetCacheDir_DiskFull();
 	OUUJSONDATARUNTIME_API FString GetCacheMountPointRoot_DiskFull(const FName& RootName);
 
 	OUUJSONDATARUNTIME_API bool PackageIsJsonData(const FString& PackagePath);
