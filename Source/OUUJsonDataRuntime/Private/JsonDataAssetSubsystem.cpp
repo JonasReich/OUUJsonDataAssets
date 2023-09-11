@@ -786,7 +786,8 @@ void UJsonDataAssetSubsystem::CleanupAssetCache(const FName& RootName)
 	}
 
 	const bool bPurgeCVarValue = OUU::JsonData::Runtime::Private::CVar_PurgeAssetCacheOnStartup.GetValueOnGameThread();
-	if (bPurgeCVarValue || (OUU::JsonData::Runtime::FCacheVersion::IsCacheCompatible() == false))
+	if (bPurgeCVarValue || (OUU::JsonData::Runtime::FCacheVersion::IsCacheCompatible() == false)
+		|| IsRunningCookCommandlet())
 	{
 		UE_LOG(
 			LogJsonDataAsset,
