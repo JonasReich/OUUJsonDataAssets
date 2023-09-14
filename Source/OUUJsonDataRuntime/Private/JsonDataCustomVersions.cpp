@@ -34,11 +34,23 @@ int32 FJsonDataCustomVersions::GetCustomVersion(const FGuid& CustomVersionGuid) 
 	return -1;
 }
 
-void FJsonDataCustomVersions::EnsureExpectedVersions(const TSet<FGuid>& CustomVersionGuids)
+void FJsonDataCustomVersions::CollectVersions(UStruct* StructDefinition, const void* Data)
 {
-	for (const auto& Guid : CustomVersionGuids)
+	if (StructDefinition == nullptr || Data == nullptr)
 	{
-		VersionsByGuid.FindOrAdd(Guid, -1);
+		return;
+	}
+
+	FArchiveUObject VersionCollector;
+	VersionCollector.SetIsSaving(true);
+
+	StructDefinition->SerializeBin(VersionCollector, const_cast<void*>(Data));
+
+	const auto CollectedVersions = VersionCollector.GetCustomVersions();
+
+	for (const auto& Entry : CollectedVersions.GetAllVersions())
+	{
+		VersionsByGuid.FindOrAdd(Entry.Key, Entry.Version);
 	}
 }
 
@@ -65,4 +77,19 @@ void FJsonDataCustomVersions::ReadFromJsonObject(const TSharedPtr<FJsonObject>& 
 			VersionsByGuid.Add(FGuid(Entry.Key), JsonObject->GetIntegerField(Entry.Key));
 		}
 	}
+}
+
+FCustomVersionContainer FJsonDataCustomVersions::ToCustomVersionContainer() const
+{
+	FCustomVersionContainer Result;
+	for (const auto& Entry : VersionsByGuid)
+	{
+		const auto OptVersion = FCurrentCustomVersions::Get(Entry.Key);
+		Result.SetVersion(
+			Entry.Key,
+			Entry.Value,
+			OptVersion.IsSet() ? OptVersion.GetValue().GetFriendlyName() : NAME_None);
+	}
+
+	return Result;
 }

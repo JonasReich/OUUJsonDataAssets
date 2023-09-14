@@ -11,7 +11,6 @@
 // Include all the utility headers from here for backwards compatibility
 #include "JsonDataAssetPath.h"
 #include "JsonDataAssetPointers.h"
-#include "JsonDataCustomVersions.h"
 
 // Explicitly exclude the json data asset library. It's mainly intended for Blueprint use.
 // #include "JsonDataAsset/JsonDataAssetLibrary.h"
@@ -97,7 +96,7 @@ public:
 	 */
 	virtual bool PostLoadJsonData(
 		const FEngineVersion& EngineVersion,
-		const FJsonDataCustomVersions& CustomVersions,
+		const FArchive& VersionLoadingArchive,
 		TSharedRef<FJsonObject> JsonObject);
 
 protected:
@@ -105,8 +104,9 @@ protected:
 	// being reinstanced.
 	bool MustHandleRename(UObject* OldOuter, const FName OldName) const;
 
-	// Get a list of custom version identifiers used by this object
-	virtual TSet<FGuid> GetRelevantCustomVersions() const;
+	// Get a list of additional custom version identifiers used by this object (Versions added via UsingCustomVersion
+	// during any Serialize calls will be added automatically)
+	virtual TSet<FGuid> GetAdditionalRelevantCustomVersions() const;
 
 private:
 	// The actual loading logic that takes care of creating UObjects. Call the json property load internally.

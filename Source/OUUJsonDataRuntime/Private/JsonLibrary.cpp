@@ -2,6 +2,7 @@
 
 #include "JsonLibrary.h"
 
+#include "JsonDataCustomVersions.h"
 #include "JsonUtilities.h"
 #include "LogJsonDataAsset.h"
 #include "Misc/PackageName.h"
@@ -628,14 +629,15 @@ struct FJsonLibraryExportHelper
 struct FJsonLibraryImportHelper
 {
 	// clang-format off
-	bool JsonValueToFPropertyWithContainer(const TSharedPtr<FJsonValue>& JsonValue, FProperty* Property, void* OutValue, const UStruct* ContainerStruct, void* Container, int64 CheckFlags, int64 SkipFlags, const bool bStrictMode, FText* OutFailReason);
-	bool JsonAttributesToUStructWithContainer(const TMap< FString, TSharedPtr<FJsonValue> >& JsonAttributes, const UStruct* StructDefinition, void* OutStruct, const UStruct* ContainerStruct, void* Container, int64 CheckFlags, int64 SkipFlags, const bool bStrictMode, FText* OutFailReason);
+	bool JsonValueToFPropertyWithContainer(const TSharedPtr<FJsonValue>& JsonValue, FProperty* Property, void* OutValue, const UStruct* ContainerStruct, void* Container, const FArchive& VersionLoadingArchive, int64 CheckFlags, int64 SkipFlags, const bool bStrictMode, FText* OutFailReason);
+	bool JsonAttributesToUStructWithContainer(const TMap< FString, TSharedPtr<FJsonValue> >& JsonAttributes, const UStruct* StructDefinition, void* OutStruct, const UStruct* ContainerStruct, void* Container, const FArchive& VersionLoadingArchive, int64 CheckFlags, int64 SkipFlags, const bool bStrictMode, FText* OutFailReason);
 	// clang-format on
 
 	bool JsonValueToUProperty(
 		const TSharedPtr<FJsonValue>& JsonValue,
 		FProperty* Property,
 		void* OutValue,
+		const FArchive& VersionLoadingArchive,
 		int64 CheckFlags,
 		int64 SkipFlags,
 		const bool bStrictMode = false,
@@ -647,6 +649,7 @@ struct FJsonLibraryImportHelper
 			OutValue,
 			nullptr,
 			nullptr,
+			VersionLoadingArchive,
 			CheckFlags,
 			SkipFlags,
 			bStrictMode,
@@ -657,6 +660,7 @@ struct FJsonLibraryImportHelper
 		const TSharedRef<FJsonObject>& JsonObject,
 		const UStruct* StructDefinition,
 		void* OutStruct,
+		const FArchive& VersionLoadingArchive,
 		int64 CheckFlags,
 		int64 SkipFlags,
 		const bool bStrictMode = false,
@@ -666,6 +670,7 @@ struct FJsonLibraryImportHelper
 			JsonObject->Values,
 			StructDefinition,
 			OutStruct,
+			VersionLoadingArchive,
 			CheckFlags,
 			SkipFlags,
 			bStrictMode,
@@ -676,6 +681,7 @@ struct FJsonLibraryImportHelper
 		const TMap<FString, TSharedPtr<FJsonValue>>& JsonAttributes,
 		const UStruct* StructDefinition,
 		void* OutStruct,
+		const FArchive& VersionLoadingArchive,
 		int64 CheckFlags,
 		int64 SkipFlags,
 		const bool bStrictMode = false,
@@ -687,6 +693,7 @@ struct FJsonLibraryImportHelper
 			OutStruct,
 			StructDefinition,
 			OutStruct,
+			VersionLoadingArchive,
 			CheckFlags,
 			SkipFlags,
 			bStrictMode,
@@ -701,6 +708,7 @@ struct FJsonLibraryImportHelper
 		void* OutValue,
 		const UStruct* ContainerStruct,
 		void* Container,
+		const FArchive& VersionLoadingArchive,
 		int64 CheckFlags,
 		int64 SkipFlags,
 		const bool bStrictMode,
@@ -842,6 +850,7 @@ struct FJsonLibraryImportHelper
 								Helper.GetRawPtr(i),
 								ContainerStruct,
 								Container,
+								VersionLoadingArchive,
 								CheckFlags & (~CPF_ParmFlags),
 								SkipFlags,
 								bStrictMode,
@@ -910,6 +919,7 @@ struct FJsonLibraryImportHelper
 								Helper.GetKeyPtr(NewIndex),
 								ContainerStruct,
 								Container,
+								VersionLoadingArchive,
 								CheckFlags & (~CPF_ParmFlags),
 								SkipFlags,
 								bStrictMode,
@@ -938,6 +948,7 @@ struct FJsonLibraryImportHelper
 								Helper.GetValuePtr(NewIndex),
 								ContainerStruct,
 								Container,
+								VersionLoadingArchive,
 								CheckFlags & (~CPF_ParmFlags),
 								SkipFlags,
 								bStrictMode,
@@ -1003,6 +1014,7 @@ struct FJsonLibraryImportHelper
 								Helper.GetElementPtr(NewIndex),
 								ContainerStruct,
 								Container,
+								VersionLoadingArchive,
 								CheckFlags & (~CPF_ParmFlags),
 								SkipFlags,
 								bStrictMode,
@@ -1106,6 +1118,7 @@ struct FJsonLibraryImportHelper
 						OutValue,
 						ContainerStruct,
 						Container,
+						VersionLoadingArchive,
 						CheckFlags & (~CPF_ParmFlags),
 						SkipFlags,
 						bStrictMode,
@@ -1369,6 +1382,7 @@ struct FJsonLibraryImportHelper
 						createdObj,
 						PropertyClass,
 						createdObj,
+						VersionLoadingArchive,
 						CheckFlags & (~CPF_ParmFlags),
 						SkipFlags,
 						bStrictMode,
@@ -1450,6 +1464,7 @@ bool FJsonLibraryImportHelper::JsonValueToFPropertyWithContainer(
 	void* OutValue,
 	const UStruct* ContainerStruct,
 	void* Container,
+	const FArchive& VersionLoadingArchive,
 	int64 CheckFlags,
 	int64 SkipFlags,
 	const bool bStrictMode,
@@ -1513,6 +1528,7 @@ bool FJsonLibraryImportHelper::JsonValueToFPropertyWithContainer(
 			OutValue,
 			ContainerStruct,
 			Container,
+			VersionLoadingArchive,
 			CheckFlags,
 			SkipFlags,
 			bStrictMode,
@@ -1530,6 +1546,7 @@ bool FJsonLibraryImportHelper::JsonValueToFPropertyWithContainer(
 			OutValue,
 			ContainerStruct,
 			Container,
+			VersionLoadingArchive,
 			CheckFlags,
 			SkipFlags,
 			bStrictMode,
@@ -1576,6 +1593,7 @@ bool FJsonLibraryImportHelper::JsonValueToFPropertyWithContainer(
 				static_cast<char*>(OutValue) + Index * Property->ElementSize,
 				ContainerStruct,
 				Container,
+				VersionLoadingArchive,
 				CheckFlags,
 				SkipFlags,
 				bStrictMode,
@@ -1593,6 +1611,7 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 	void* OutStruct,
 	const UStruct* ContainerStruct,
 	void* Container,
+	const FArchive& VersionLoadingArchive,
 	int64 CheckFlags,
 	int64 SkipFlags,
 	const bool bStrictMode,
@@ -1663,6 +1682,7 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 					Value,
 					ContainerStruct,
 					Container,
+					VersionLoadingArchive,
 					CheckFlags,
 					SkipFlags,
 					bStrictMode,
@@ -1703,6 +1723,16 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 		{
 			pObject->SetFlags(RF_NeedPostLoad);
 			pObject->ConditionalPostLoad();
+		}
+	}
+	else if (const auto ScriptStruct = Cast<UScriptStruct>(StructDefinition))
+	{
+		if (const auto StructOps = ScriptStruct->GetCppStructOps())
+		{
+			if (StructOps->HasPostSerialize())
+			{
+				StructOps->PostSerialize(VersionLoadingArchive, OutStruct);
+			}
 		}
 	}
 	// GRIMLORE End
@@ -1769,11 +1799,12 @@ bool UOUUJsonLibrary::JsonValueToUProperty(
 	TSharedRef<FJsonValue> JsonValue,
 	void* PropertyData,
 	FProperty* Property,
+	const FArchive& VersionLoadingArchive,
 	int64 CheckFlags /* = 0 */,
 	int64 SkipFlags /* = 0 */)
 {
 	FJsonLibraryImportHelper Helper;
-	return Helper.JsonValueToUProperty(JsonValue, Property, PropertyData, CheckFlags, SkipFlags);
+	return Helper.JsonValueToUProperty(JsonValue, Property, PropertyData, VersionLoadingArchive, CheckFlags, SkipFlags);
 }
 
 FString UOUUJsonLibrary::UObjectToJsonString(
@@ -1798,6 +1829,21 @@ FString UOUUJsonLibrary::UObjectToJsonString(
 bool UOUUJsonLibrary::JsonStringToUObject(
 	UObject* Object,
 	FString String,
+	const FJsonDataCustomVersions& CustomVersions,
+	int64 CheckFlags /* = 0 */,
+	int64 SkipFlags /* = 0 */)
+{
+	FArchive VersionLoadingArchive;
+	VersionLoadingArchive.SetIsLoading(true);
+	VersionLoadingArchive.SetCustomVersions(CustomVersions.ToCustomVersionContainer());
+
+	return JsonStringToUObject(Object, String, VersionLoadingArchive, CheckFlags, SkipFlags);
+}
+
+bool UOUUJsonLibrary::JsonStringToUObject(
+	UObject* Object,
+	FString String,
+	const FArchive& VersionLoadingArchive,
 	int64 CheckFlags /* = 0 */,
 	int64 SkipFlags /* = 0 */)
 {
@@ -1816,7 +1862,13 @@ bool UOUUJsonLibrary::JsonStringToUObject(
 	}
 
 	FJsonLibraryImportHelper Helper;
-	if (!Helper.JsonObjectToUStruct(JsonObject.ToSharedRef(), Object->GetClass(), Object, CheckFlags, SkipFlags))
+	if (!Helper.JsonObjectToUStruct(
+			JsonObject.ToSharedRef(),
+			Object->GetClass(),
+			Object,
+			VersionLoadingArchive,
+			CheckFlags,
+			SkipFlags))
 	{
 		UE_LOG(LogJsonDataAsset, Warning, TEXT("JsonStringToUObject - Unable to deserialize. json=[%s]"), *String);
 		return false;
@@ -1828,11 +1880,18 @@ bool UOUUJsonLibrary::JsonObjectToUStruct(
 	const TSharedRef<FJsonObject>& JsonObject,
 	const UStruct* StructDefinition,
 	void* OutStruct,
+	const FArchive& VersionLoadingArchive,
 	int64 CheckFlags /* = 0 */,
 	int64 SkipFlags /* = 0 */)
 {
 	FJsonLibraryImportHelper Helper;
-	if (!Helper.JsonObjectToUStruct(JsonObject, StructDefinition, OutStruct, CheckFlags, SkipFlags))
+	if (!Helper.JsonObjectToUStruct(
+			JsonObject,
+			StructDefinition,
+			OutStruct,
+			VersionLoadingArchive,
+			CheckFlags,
+			SkipFlags))
 	{
 		UE_LOG(LogJsonDataAsset, Warning, TEXT("JsonObjectToUStruct - Unable to deserialize json object."));
 		return false;
@@ -1843,6 +1902,7 @@ bool UOUUJsonLibrary::JsonObjectToUStruct(
 bool UOUUJsonLibrary::JsonObjectToUObject(
 	const TSharedRef<FJsonObject>& JsonObject,
 	UObject* OutObject,
+	const FArchive& VersionLoadingArchive,
 	int64 CheckFlags /* = 0 */,
 	int64 SkipFlags /* = 0 */)
 {
@@ -1852,5 +1912,11 @@ bool UOUUJsonLibrary::JsonObjectToUObject(
 		return false;
 	}
 
-	return JsonObjectToUStruct(JsonObject, OutObject->GetClass(), OutObject, CheckFlags, SkipFlags);
+	return JsonObjectToUStruct(
+		JsonObject,
+		OutObject->GetClass(),
+		OutObject,
+		VersionLoadingArchive,
+		CheckFlags,
+		SkipFlags);
 }

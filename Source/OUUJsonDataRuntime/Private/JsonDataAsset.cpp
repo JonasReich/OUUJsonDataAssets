@@ -9,11 +9,13 @@
 #include "HAL/PlatformFile.h"
 #include "JsonDataAssetGlobals.h"
 #include "JsonDataAssetSubsystem.h"
+#include "JsonDataCustomVersions.h"
 #include "JsonLibrary.h"
 #include "JsonObjectConverter.h"
 #include "LogJsonDataAsset.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Serialization/CustomVersion.h"
 #include "UObject/ObjectSaveContext.h"
 #include "UObject/SavePackage.h"
 
@@ -134,8 +136,6 @@ bool UJsonDataAsset::ImportJson(TSharedPtr<FJsonObject> JsonObject, bool bCheckC
 		CustomVersions.ReadFromJsonObject(*ppCustomVersionsObject);
 	}
 
-	CustomVersions.EnsureExpectedVersions(GetRelevantCustomVersions());
-
 	// ---
 	// Property data
 	// ---
@@ -154,13 +154,17 @@ bool UJsonDataAsset::ImportJson(TSharedPtr<FJsonObject> JsonObject, bool bCheckC
 		UEngine::CopyPropertiesForUnrelatedObjects(CDO, this, Options);
 	}
 
-	if (!UOUUJsonLibrary::JsonObjectToUStruct(Data.ToSharedRef(), GetClass(), this, 0, 0))
+	FArchive VersionLoadingArchive;
+	VersionLoadingArchive.SetIsLoading(true);
+	VersionLoadingArchive.SetCustomVersions(CustomVersions.ToCustomVersionContainer());
+
+	if (!UOUUJsonLibrary::JsonObjectToUStruct(Data.ToSharedRef(), GetClass(), this, VersionLoadingArchive, 0, 0))
 	{
 		UE_JSON_DATA_MESSAGELOG(Error, this, TEXT("Failed to import json 'Data' field into UObject properties"));
 		return false;
 	}
 
-	return PostLoadJsonData(EngineVersion, CustomVersions, Data.ToSharedRef());
+	return PostLoadJsonData(EngineVersion, VersionLoadingArchive, Data.ToSharedRef());
 }
 
 TSharedRef<FJsonObject> UJsonDataAsset::ExportJson() const
@@ -173,7 +177,8 @@ TSharedRef<FJsonObject> UJsonDataAsset::ExportJson() const
 		Result->SetStringField(TEXT("EngineVersion"), FEngineVersion::Current().ToString());
 		Result->SetBoolField(TEXT("IsLicenseeVersion"), FEngineVersion::Current().IsLicenseeVersion());
 
-		const FJsonDataCustomVersions CustomVersions(GetRelevantCustomVersions());
+		FJsonDataCustomVersions CustomVersions(GetAdditionalRelevantCustomVersions());
+		CustomVersions.CollectVersions(GetClass(), this);
 		Result->SetObjectField(TEXT("CustomVersions"), CustomVersions.ToJsonObject());
 	}
 
@@ -295,7 +300,7 @@ bool UJsonDataAsset::ExportJsonFile() const
 
 bool UJsonDataAsset::PostLoadJsonData(
 	const FEngineVersion& EngineVersion,
-	const FJsonDataCustomVersions& CustomVersions,
+	const FArchive& VersionLoadingArchive,
 	TSharedRef<FJsonObject> JsonObject)
 {
 	return true;
@@ -318,7 +323,7 @@ bool UJsonDataAsset::MustHandleRename(UObject* OldOuter, const FName OldName) co
 	return (OldOuter == nullptr || NewOuter == nullptr || OldOuter->GetPathName() != NewOuter->GetPathName());
 }
 
-TSet<FGuid> UJsonDataAsset::GetRelevantCustomVersions() const
+TSet<FGuid> UJsonDataAsset::GetAdditionalRelevantCustomVersions() const
 {
 	return {};
 }

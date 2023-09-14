@@ -9,6 +9,8 @@
 
 #include "JsonLibrary.generated.h"
 
+struct FJsonDataCustomVersions;
+
 USTRUCT(BlueprintType)
 struct OUUJSONDATARUNTIME_API FOUUJsonLibraryObjectFilter
 {
@@ -66,6 +68,7 @@ public:
 		TSharedRef<FJsonValue> JsonValue,
 		void* PropertyData,
 		FProperty* Property,
+		const FArchive& VersionLoadingArchive,
 		int64 CheckFlags = 0,
 		int64 SkipFlags = 0);
 
@@ -82,7 +85,19 @@ public:
 		bool bOnlyModifiedProperties = false);
 
 	UFUNCTION(BlueprintCallable)
-	static bool JsonStringToUObject(UObject* Object, FString String, int64 CheckFlags = 0, int64 SkipFlags = 0);
+	static bool JsonStringToUObject(
+		UObject* Object,
+		FString String,
+		const FJsonDataCustomVersions& CustomVersions,
+		int64 CheckFlags = 0,
+		int64 SkipFlags = 0);
+
+	static bool JsonStringToUObject(
+		UObject* Object,
+		FString String,
+		const FArchive& VersionLoadingArchive,
+		int64 CheckFlags = 0,
+		int64 SkipFlags = 0);
 
 	/**
 	 * Copy of FJsonObjectConverter::JsonObjectToUStruct that handles object loading more smoothly (e.g. by resolving
@@ -92,12 +107,14 @@ public:
 		const TSharedRef<FJsonObject>& JsonObject,
 		const UStruct* StructDefinition,
 		void* OutStruct,
+		const FArchive& VersionLoadingArchive,
 		int64 CheckFlags = 0,
 		int64 SkipFlags = 0);
 
 	static bool JsonObjectToUObject(
 		const TSharedRef<FJsonObject>& JsonObject,
 		UObject* OutObject,
+		const FArchive& VersionLoadingArchive,
 		int64 CheckFlags = 0,
 		int64 SkipFlags = 0);
 };
