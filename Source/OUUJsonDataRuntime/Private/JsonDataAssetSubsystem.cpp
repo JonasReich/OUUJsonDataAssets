@@ -217,7 +217,7 @@ void UJsonDataAssetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 	bAutoExportJson = true;
 
-	FCoreDelegates::OnPostEngineInit.AddUObject(this, &UJsonDataAssetSubsystem::PostEngineInit);
+	FCoreDelegates::OnAllModuleLoadingPhasesComplete.AddUObject(this, &UJsonDataAssetSubsystem::PostEngineInit);
 
 #if WITH_EDITOR
 	FEditorDelegates::OnPackageDeleted.AddUObject(this, &UJsonDataAssetSubsystem::HandlePackageDeleted);
@@ -534,40 +534,45 @@ void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyM
 			return true;
 		}
 
-		UPackage* NewPackage = NewDataAsset->GetPackage();
-
-		// The name of the package
-		const FString PackageName = NewPackage->GetName();
-
-		// Construct a filename from long package name.
-		const FString& FileExtension = FPackageName::GetAssetPackageExtension();
-		PackageFilename = FPackageName::LongPackageNameToFilename(PackagePath, FileExtension);
-
-		// The file already exists, no need to prompt for save as
-		FString BaseFilename, Extension, Directory;
-		// Split the path to get the filename without the directory structure
-		FPaths::NormalizeFilename(PackageFilename);
-		FPaths::Split(PackageFilename, Directory, BaseFilename, Extension);
-
-		FSavePackageArgs SaveArgs;
-		SaveArgs.TopLevelFlags = RF_Standalone;
-		SaveArgs.Error = GWarn;
-		auto SaveResult = UPackage::Save(NewPackage, NewDataAsset, *PackageFilename, SaveArgs);
-
-		if (SaveResult == ESavePackageResult::Success)
+#if WITH_EDITOR
+		if (GIsEditor)
 		{
-			NumPackagesLoaded++;
-		}
-		else
-		{
-			UE_JSON_DATA_MESSAGELOG(
-				Error,
-				NewPackage,
-				TEXT("Failed to save package for json data asset %s"),
-				*FilePath);
+			UPackage* NewPackage = NewDataAsset->GetPackage();
 
-			NumPackagesFailedToLoad++;
+			// The name of the package
+			const FString PackageName = NewPackage->GetName();
+
+			// Construct a filename from long package name.
+			const FString& FileExtension = FPackageName::GetAssetPackageExtension();
+			PackageFilename = FPackageName::LongPackageNameToFilename(PackagePath, FileExtension);
+
+			// The file already exists, no need to prompt for save as
+			FString BaseFilename, Extension, Directory;
+			// Split the path to get the filename without the directory structure
+			FPaths::NormalizeFilename(PackageFilename);
+			FPaths::Split(PackageFilename, Directory, BaseFilename, Extension);
+
+			FSavePackageArgs SaveArgs;
+			SaveArgs.TopLevelFlags = RF_Standalone;
+			SaveArgs.Error = GWarn;
+			auto SaveResult = UPackage::Save(NewPackage, NewDataAsset, *PackageFilename, SaveArgs);
+
+			if (SaveResult == ESavePackageResult::Success)
+			{
+				NumPackagesLoaded++;
+			}
+			else
+			{
+				UE_JSON_DATA_MESSAGELOG(
+					Error,
+					NewPackage,
+					TEXT("Failed to save package for json data asset %s"),
+					FilePath);
+
+				NumPackagesFailedToLoad++;
+			}
 		}
+#endif
 		return true;
 	};
 
@@ -883,6 +888,12 @@ void UJsonDataAssetSubsystem::ModifyCook(TArray<FString>& OutExtraPackagesToCook
 	AssetRegistry.WaitForCompletion();
 
 	ensure(bIsInitialAssetImportCompleted);
+
+	// Delete files from previous cook
+	for (auto SourceDir : GetAllSourceDirectories(EJsonDataAccessMode::Write))
+	{
+		FPlatformFileManager::Get().GetPlatformFile().DeleteDirectoryRecursively(*SourceDir);
+	}
 
 	TSet<FName> DependencyPackages;
 	for (auto& RootName : AllRootNames)
