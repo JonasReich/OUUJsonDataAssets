@@ -156,6 +156,7 @@ bool UJsonDataAsset::ImportJson(TSharedPtr<FJsonObject> JsonObject, bool bCheckC
 
 	FArchive VersionLoadingArchive;
 	VersionLoadingArchive.SetIsLoading(true);
+	VersionLoadingArchive.SetIsPersistent(true);
 	VersionLoadingArchive.SetCustomVersions(CustomVersions.ToCustomVersionContainer());
 
 	if (!UOUUJsonLibrary::JsonObjectToUStruct(Data.ToSharedRef(), GetClass(), this, VersionLoadingArchive, 0, 0))

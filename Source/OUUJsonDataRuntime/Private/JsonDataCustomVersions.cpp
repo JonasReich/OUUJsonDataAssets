@@ -43,6 +43,7 @@ void FJsonDataCustomVersions::CollectVersions(UStruct* StructDefinition, const v
 
 	FArchiveUObject VersionCollector;
 	VersionCollector.SetIsSaving(true);
+	VersionCollector.SetIsPersistent(true);
 
 	StructDefinition->SerializeBin(VersionCollector, const_cast<void*>(Data));
 

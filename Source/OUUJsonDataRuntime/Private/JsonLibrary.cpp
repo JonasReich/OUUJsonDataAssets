@@ -1835,6 +1835,7 @@ bool UOUUJsonLibrary::JsonStringToUObject(
 {
 	FArchive VersionLoadingArchive;
 	VersionLoadingArchive.SetIsLoading(true);
+	VersionLoadingArchive.SetIsPersistent(true);
 	VersionLoadingArchive.SetCustomVersions(CustomVersions.ToCustomVersionContainer());
 
 	return JsonStringToUObject(Object, String, VersionLoadingArchive, CheckFlags, SkipFlags);
