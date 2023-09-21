@@ -1408,7 +1408,8 @@ struct FJsonLibraryImportHelper
 			else if (JsonValue->Type == EJson::String)
 			{
 				// Default to expect a string for everything else
-				if (Property->ImportText_Direct(*JsonValue->AsString(), OutValue, nullptr, 0) == nullptr)
+				if (Property->ImportText_Direct(*JsonValue->AsString(), OutValue, nullptr, PPF_SerializedAsImportText)
+					== nullptr)
 				{
 					UE_LOG(
 						LogJsonDataAsset,
@@ -1434,10 +1435,104 @@ struct FJsonLibraryImportHelper
 				// GRIMLORE End
 			}
 		}
+		// GRIMLORE Start dlehn: Fixed interface properties not resolving redirectors when loading
+		else if (FInterfaceProperty* InterfaceProperty = CastField<FInterfaceProperty>(Property))
+		{
+			if (JsonValue->Type == EJson::String)
+			{
+				const auto StringValue = JsonValue->AsString();
+				const TCHAR* Buffer = *StringValue;
+				UObject* TargetObject = nullptr;
+				if (FObjectPropertyBase::ParseObjectPropertyValue(
+						InterfaceProperty,
+						nullptr,
+						UObject::StaticClass(),
+						PPF_SerializedAsImportText,
+						Buffer,
+						TargetObject)
+					== false)
+				{
+					UE_LOG(
+						LogJsonDataAsset,
+						Error,
+						TEXT("JsonValueToUProperty - Unable to import JSON string into %s property %s"),
+						*InterfaceProperty->InterfaceClass->GetAuthoredName(),
+						*Property->GetAuthoredName());
+					if (OutFailReason)
+					{
+						*OutFailReason = FText::Format(
+							INVTEXT("Unable to import JSON string into {0} property {1}"),
+							FText::FromString(*InterfaceProperty->InterfaceClass->GetAuthoredName()),
+							FText::FromString(Property->GetAuthoredName()));
+					}
+					return false;
+				}
+
+				while (auto* Redirector = Cast<UObjectRedirector>(TargetObject))
+				{
+					TargetObject = Redirector->DestinationObject;
+				}
+
+				FScriptInterface LoadedValue;
+				if (TargetObject)
+				{
+					if (TargetObject->GetClass()->ImplementsInterface(InterfaceProperty->InterfaceClass))
+					{
+						LoadedValue.SetObject(TargetObject);
+						LoadedValue.SetInterface(TargetObject->GetInterfaceAddress(InterfaceProperty->InterfaceClass));
+					}
+					else
+					{
+						UE_LOG(
+							LogJsonDataAsset,
+							Error,
+							TEXT("JsonValueToUProperty - Unable to import JSON string into %s property %s because "
+								 "target object '%s' does not implement required interface."),
+							*InterfaceProperty->InterfaceClass->GetAuthoredName(),
+							*Property->GetAuthoredName(),
+							*TargetObject->GetPathName());
+						if (OutFailReason)
+						{
+							*OutFailReason = FText::Format(
+								INVTEXT("Unable to import JSON string into {0} property {1} because target object '%s' "
+										"does not implement required interface"),
+								FText::FromString(InterfaceProperty->InterfaceClass->GetAuthoredName()),
+								FText::FromString(Property->GetAuthoredName()),
+								FText::FromString(TargetObject->GetPathName()));
+						}
+
+						// Don't return false here, that is not a fatal error.
+					}
+				}
+
+				InterfaceProperty->SetPropertyValue(OutValue, LoadedValue);
+			}
+			else
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Error,
+					TEXT("JsonValueToUProperty - Unable to import JSON string into %s property %s because we expect "
+						 "interface pointers to be serialized as a string."),
+					*InterfaceProperty->InterfaceClass->GetAuthoredName(),
+					*Property->GetAuthoredName());
+				if (OutFailReason)
+				{
+					*OutFailReason = FText::Format(
+						INVTEXT("Unable to import JSON string into {0} property {1} because we expect interface "
+								"pointers to be serialized as a string."),
+						FText::FromString(*InterfaceProperty->InterfaceClass->GetAuthoredName()),
+						FText::FromString(Property->GetAuthoredName()));
+				}
+				return false;
+			}
+		}
+		// GRIMLORE End
 		else
 		{
 			// Default to expect a string for everything else
-			if (Property->ImportText_Direct(*JsonValue->AsString(), OutValue, nullptr, 0) == nullptr)
+			if (Property->ImportText_Direct(*JsonValue->AsString(), OutValue, nullptr, PPF_SerializedAsImportText)
+				== nullptr)
 			{
 				UE_LOG(
 					LogJsonDataAsset,

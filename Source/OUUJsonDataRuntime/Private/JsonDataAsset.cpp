@@ -74,7 +74,7 @@ bool UJsonDataAsset::ImportJson(TSharedPtr<FJsonObject> JsonObject, bool bCheckC
 	{
 		FString ClassName = JsonObject->GetStringField(TEXT("Class"));
 		// Better search for the class instead of mandating a perfect string match
-		auto* JsonClass = Cast<UClass>(FSoftObjectPath(ClassName).ResolveObject());
+		auto* JsonClass = ResolveObjectPath<UClass>(ClassName, false);
 
 		// There is a chance in the editor that a blueprint class may get recompiled while a json object is being
 		// loaded. In that case	the IsChildOf check will fail and we need to manually check if our current class is the
@@ -396,7 +396,7 @@ UJsonDataAsset* UJsonDataAsset::LoadJsonDataAsset_Internal(FJsonDataAssetPath Pa
 	{
 		FString ClassName = JsonObject->GetStringField(TEXT("Class"));
 		// Need to use TryLoad() instead of ResolveObject() so blueprint classes can be loaded.
-		auto* pClass = Cast<UClass>(FSoftObjectPath(ClassName).TryLoad());
+		auto* pClass = ResolveObjectPath<UClass>(ClassName, true);
 		if (!pClass)
 		{
 			UE_JSON_DATA_MESSAGELOG(
@@ -440,6 +440,18 @@ UJsonDataAsset* UJsonDataAsset::LoadJsonDataAsset_Internal(FJsonDataAssetPath Pa
 	}
 
 	return ExistingOrGeneratedAsset;
+}
+
+template <typename ObjectT>
+ObjectT* UJsonDataAsset::ResolveObjectPath(const FString& Path, const bool AllowLoading)
+{
+	FSoftObjectPath SoftPath(Path);
+
+#if WITH_EDITOR
+	SoftPath.FixupCoreRedirects();
+#endif
+
+	return Cast<ObjectT>(AllowLoading ? SoftPath.TryLoad() : SoftPath.ResolveObject());
 }
 
 bool UJsonDataAsset::Rename(

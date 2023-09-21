@@ -111,6 +111,9 @@ protected:
 private:
 	// The actual loading logic that takes care of creating UObjects. Call the json property load internally.
 	static UJsonDataAsset* LoadJsonDataAsset_Internal(FJsonDataAssetPath Path, UJsonDataAsset* ExistingDataAsset);
+	// Resolve a loaded object path, fixing up redirectors as required.
+	template <typename ObjectT = UObject>
+	static ObjectT* ResolveObjectPath(const FString& Path, const bool AllowLoading);
 
 public:
 	// - UObject interface
