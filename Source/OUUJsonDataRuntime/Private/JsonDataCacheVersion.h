@@ -25,8 +25,11 @@ namespace OUU::JsonData::Runtime
 	{
 		bool bIsValid = false;
 		FEngineVersion EngineVersion;
-		bool bEngineIsLicenseeVersion;
+		bool bEngineIsLicenseeVersion = false;
 		int32 JsonRuntimeVersion = INDEX_NONE;
+
+		FCacheVersion() = default;
+		FCacheVersion(bool bInIsValid) : bIsValid(bInIsValid) {}
 
 		static FString GetPathAbs()
 		{
@@ -56,22 +59,29 @@ namespace OUU::JsonData::Runtime
 			ensure(FFileHelper::SaveStringToFile(JsonString, *GetPathAbs()));
 		}
 
+		static FCacheVersion Invalid() { return FCacheVersion(false); }
+
 		static FCacheVersion Read()
 		{
 			FCacheVersion Result;
 			const FString FilePath = GetPathAbs();
 
-			// is this sufficient?
-			Result.bIsValid = FPaths::FileExists(*FilePath);
-
-			if (Result.bIsValid == false)
-				return Result;
+			if (FPaths::FileExists(*FilePath) == false)
+			{
+				return FCacheVersion::Invalid();
+			}
 
 			FString JsonString;
 			ensure(FFileHelper::LoadFileToString(JsonString, *FilePath));
 			TSharedPtr<FJsonObject> JsonObject;
 			TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(JsonString);
-			ensure(FJsonSerializer::Deserialize(JsonReader, JsonObject) || !JsonObject.IsValid());
+			if (ensureMsgf(
+					FJsonSerializer::Deserialize(JsonReader, JsonObject) && JsonObject.IsValid(),
+					TEXT("JsonObject could not be deserialized even though the file on-disk exists."))
+				== false)
+			{
+				return FCacheVersion::Invalid();
+			}
 
 			ensure(
 				FEngineVersion::Parse(JsonObject->GetStringField(JsonProps::EngineVersion), OUT Result.EngineVersion));
@@ -86,6 +96,7 @@ namespace OUU::JsonData::Runtime
 
 			ensure(JsonObject->TryGetNumberField(JsonProps::JsonRuntimeVersion, OUT Result.JsonRuntimeVersion));
 
+			Result.bIsValid = true;
 			return Result;
 		}
 
