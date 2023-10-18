@@ -2,6 +2,10 @@
 
 #include "JsonLibrary.h"
 
+// GRIMLORE Start dlehn: Custom handling for gameplay tags and containers
+#include "GameplayTagContainer.h"
+#include "GameplayTagsManager.h"
+// GRIMLORE End
 #include "JsonDataCustomVersions.h"
 #include "JsonUtilities.h"
 #include "LogJsonDataAsset.h"
@@ -315,6 +319,27 @@ struct FJsonLibraryExportHelper
 				TheCppStructOps->ExportTextItem(OutValueStr, Value, nullptr, nullptr, PPF_None, nullptr);
 				return FOUUPropertyJsonResult::Json(MakeShared<FJsonValueString>(OutValueStr));
 			}
+
+			// GRIMLORE Start dlehn: Gameplay tags and containers for WHATEVER REASON have an IMPORTTextItem function
+			// but no EXPORTTextItem, so we have to handle this manually.
+			if (StructProperty->Struct->IsChildOf(FGameplayTag::StaticStruct()))
+			{
+				const auto& Tag = *(const FGameplayTag*)Value;
+				return FOUUPropertyJsonResult::Json(MakeShared<FJsonValueString>(Tag.ToString()));
+			}
+			else if (StructProperty->Struct->IsChildOf(FGameplayTagContainer::StaticStruct()))
+			{
+				const auto& Container = *(const FGameplayTagContainer*)Value;
+				TArray<TSharedPtr<FJsonValue>> Values;
+				Values.Reserve(Container.Num());
+				for (const auto& Tag : Container)
+				{
+					Values.Add(MakeShared<FJsonValueString>(Tag.ToString()));
+				}
+
+				return FOUUPropertyJsonResult::Json(MakeShared<FJsonValueArray>(Values));
+			}
+			// GRIMLORE End
 
 			TSharedRef<FJsonObject> Out = MakeShared<FJsonObject>();
 			bool MinimumOneValueSet = false;
@@ -1651,6 +1676,29 @@ bool FJsonLibraryImportHelper::JsonValueToFPropertyWithContainer(
 	// We're deserializing a JSON array
 	const auto& ArrayValue = JsonValue->AsArray();
 
+	// GRIMLORE Start dlehn: Manually handle import for gameplay tag containers because the unreal ones don't
+	// properly implement it.
+	if (const auto StructProperty = CastField<FStructProperty>(Property))
+	{
+		if (StructProperty->Struct->IsChildOf(FGameplayTagContainer::StaticStruct()))
+		{
+			auto& TagContainer = *(FGameplayTagContainer*)OutValue;
+			TagContainer.Reset();
+			const auto& JsonArray = JsonValue->AsArray();
+			for (const auto& JsonTagValue : JsonArray)
+			{
+				FGameplayTag Tag;
+				if (UGameplayTagsManager::Get().ImportSingleGameplayTag(Tag, FName(*JsonTagValue->AsString()), true)
+					&& Tag.IsValid())
+				{
+					TagContainer.AddTag(Tag);
+				}
+			}
+			return true;
+		}
+	}
+	// GRIMLORE End
+
 	if (bStrictMode && (Property->ArrayDim != ArrayValue.Num()))
 	{
 		UE_LOG(
@@ -1830,6 +1878,19 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 			}
 		}
 	}
+
+	// Fix for gameplay tag container's ImportTextItem function not being called because they have no matching
+	// ExportTextItem function. So we have to manually do what they would otherwise do during import.
+	if (StructDefinition->IsChildOf(FGameplayTagContainer::StaticStruct()))
+	{
+		auto& TagContainer = *(FGameplayTagContainer*)OutStruct;
+		// Remove invalid tags. Unfortunately there is no public function to remove all invalid tags at once.
+		while (TagContainer.RemoveTag(FGameplayTag(), true))
+		{
+		}
+		TagContainer.FillParentTags();
+	}
+
 	// GRIMLORE End
 
 	return true;

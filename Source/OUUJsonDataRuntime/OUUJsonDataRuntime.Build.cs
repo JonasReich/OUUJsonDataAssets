@@ -39,7 +39,8 @@ public class OUUJsonDataRuntime : OUUJsonDataModuleRules
 			"Slate",
 			"JsonUtilities",
 			"Json",
-			"Projects"
+			"Projects",
+			"GameplayTags",
 		});
 
 		// - Editor only dependencies
