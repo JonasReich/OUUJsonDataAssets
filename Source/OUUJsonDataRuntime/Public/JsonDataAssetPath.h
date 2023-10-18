@@ -108,6 +108,7 @@ public:
 	void SetFromString(const FString& InString);
 
 	FORCEINLINE FString GetPackagePath() const { return Path.GetLongPackageName(); }
+	FORCEINLINE FString GetAssetName() const { return Path.GetAssetName(); }
 
 	FORCEINLINE friend uint32 GetTypeHash(const FJsonDataAssetPath& Other) { return GetTypeHash(Other.Path); }
 
