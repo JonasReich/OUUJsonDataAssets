@@ -19,7 +19,7 @@ namespace OUU::Editor::JsonData
 {
 	void SyncContentBrowserToItems(const TArray<FString>& ItemPaths)
 	{
-		auto ContentBrowserSubsystem = GEditor->GetEditorSubsystem<UContentBrowserDataSubsystem>();
+		const auto* ContentBrowserSubsystem = GEditor->GetEditorSubsystem<UContentBrowserDataSubsystem>();
 		TArray<FContentBrowserItem> Items;
 		for (auto& ItemPath : ItemPaths)
 		{
@@ -63,7 +63,7 @@ namespace OUU::Editor::JsonData
 			return "";
 		}
 
-		auto JsonDataPackagePath = ConvertMountedSourceFilenameToDataAssetPath(InSourceFilePath).GetPackagePath();
+		const auto JsonDataPackagePath = ConvertMountedSourceFilenameToDataAssetPath(InSourceFilePath).GetPackagePath();
 
 		FString MountedAssetPath = JsonDataPackagePath;
 
@@ -82,12 +82,12 @@ namespace OUU::Editor::JsonData
 
 	FContentBrowserItem GetGeneratedAssetContentBrowserItem(const FString& InSourceFilePath)
 	{
-		UContentBrowserDataSubsystem* ContentBrowserData = IContentBrowserDataModule::Get().GetSubsystem();
+		const UContentBrowserDataSubsystem* ContentBrowserData = IContentBrowserDataModule::Get().GetSubsystem();
 		if (ensure(IsValid(ContentBrowserData)))
 		{
 			// Redirect to asset (e.g. format
 			// "/All/JsonData/Plugins/OpenUnrealUtilities/Tests/TestAsset_AllValuesSet.TestAsset_AllValuesSet")
-			auto MountedAssetPath = ConvertMountedSourceFilenameToMountedDataAssetFilename(InSourceFilePath);
+			const auto MountedAssetPath = ConvertMountedSourceFilenameToMountedDataAssetFilename(InSourceFilePath);
 
 			auto AssetItem =
 				ContentBrowserData->GetItemAtPath(*MountedAssetPath, EContentBrowserItemTypeFilter::IncludeFiles);
@@ -103,21 +103,22 @@ namespace OUU::Editor::JsonData
 
 	void PerformDiff(const FJsonDataAssetPath& Old, const FJsonDataAssetPath& New)
 	{
-		FString OldTextFilename =
+		const FString OldTextFilename =
 			OUU::JsonData::Runtime::PackageToSourceFull(Old.GetPackagePath(), EJsonDataAccessMode::Read);
-		FString NewTextFilename =
+		const FString NewTextFilename =
 			OUU::JsonData::Runtime::PackageToSourceFull(New.GetPackagePath(), EJsonDataAccessMode::Read);
-		FString DiffCommand = GetDefault<UEditorLoadingSavingSettings>()->TextDiffToolPath.FilePath;
+		const FString DiffCommand = GetDefault<UEditorLoadingSavingSettings>()->TextDiffToolPath.FilePath;
 
+		// ReSharper disable once CppExpressionWithoutSideEffects
 		IAssetTools::Get().CreateDiffProcess(DiffCommand, OldTextFilename, NewTextFilename);
 	}
 
 	void Reload(const FJsonDataAssetPath& Path)
 	{
-		auto PackagePath = Path.GetPackagePath();
+		const auto PackagePath = Path.GetPackagePath();
 		FString PackageFilename;
 		const bool bPackageAlreadyExists = FPackageName::DoesPackageExist(PackagePath, &PackageFilename);
-		auto* JsonAsset = Path.ForceReload();
+		const auto* JsonAsset = Path.ForceReload();
 		// If called on JsonAssets that do not have a source file anymore JsonAsset result may be null
 		if (bPackageAlreadyExists && IsValid(JsonAsset))
 		{
@@ -164,19 +165,18 @@ namespace OUU::Editor::JsonData
 
 	void ContentBrowser_OpenUnrealEditor(const FJsonDataAssetPath& Path)
 	{
-		auto* JsonObject = Path.LoadSynchronous();
-		if (JsonObject)
+		if (auto* JsonObject = Path.LoadSynchronous())
 		{
 			AssetViewUtils::OpenEditorForAsset(JsonObject);
 		}
 		else
 		{
-			UE_JSON_DATA_MESSAGELOG(Error, nullptr, TEXT("Failed to load json data asset"), *Path.GetPackagePath());
+			UE_JSON_DATA_MESSAGELOG(Error, nullptr, TEXT("Failed to load json data asset %s"), *Path.GetPackagePath());
 		}
 	}
 	void ContentBrowser_OpenExternalEditor(const FJsonDataAssetPath& Path)
 	{
-		auto DiskPath = OUU::JsonData::Runtime::PackageToSourceFull(Path.GetPackagePath(), EJsonDataAccessMode::Read);
+		const auto DiskPath = OUU::JsonData::Runtime::PackageToSourceFull(Path.GetPackagePath(), EJsonDataAccessMode::Read);
 		FPlatformProcess::LaunchFileInDefaultExternalApplication(*DiskPath, nullptr, ELaunchVerb::Edit);
 	}
 } // namespace OUU::Editor::JsonData

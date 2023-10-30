@@ -128,8 +128,6 @@ namespace OUU::JsonData::Editor::Private
 			return;
 		}
 
-		bool bExactClass = GetTagOrBoolMetadata(MetadataProperty, TEXT("ExactClass"), false);
-
 		auto FindClass = [](const FString& InClassName) {
 			UClass* Class = UClass::TryFindTypeSlow<UClass>(InClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
 			if (!Class)
@@ -289,7 +287,7 @@ void FJsonDataAssetPathCustomization::CustomizeHeader(
 								  if (PathPropertyHandle->GetValueData(OUT PathAdress)
 									  == FPropertyAccess::Result::Success)
 								  {
-									  FJsonDataAssetPath& Path = *(FJsonDataAssetPath*)PathAdress;
+									  const FJsonDataAssetPath& Path = *static_cast<FJsonDataAssetPath*>(PathAdress);
 									  OUU::Editor::JsonData::ContentBrowser_NavigateToSources({Path});
 								  }
 								  return FReply::Handled();

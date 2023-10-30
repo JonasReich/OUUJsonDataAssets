@@ -1,5 +1,7 @@
 // Copyright (c) 2023 Jonas Reich & Contributors
 
+#pragma once
+
 #include "CoreMinimal.h"
 
 #include "Toolkits/SimpleAssetEditor.h"

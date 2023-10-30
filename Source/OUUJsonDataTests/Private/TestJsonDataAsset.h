@@ -67,7 +67,7 @@ public:
 	TArray<FTestJsonDataAssetStruct> ArrayOfStructs;
 
 	UPROPERTY(EditAnywhere, Instanced)
-	UTestJsonDataAsset_InstancedObject* InstancedObject;
+	UTestJsonDataAsset_InstancedObject* InstancedObject = nullptr;
 
 	UPROPERTY(EditAnywhere, Instanced)
 	TArray<UTestJsonDataAsset_InstancedObject*> ArrayOfInstancedObjects;

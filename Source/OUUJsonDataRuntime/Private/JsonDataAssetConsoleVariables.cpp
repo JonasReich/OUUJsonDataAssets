@@ -2,7 +2,6 @@
 
 #include "JsonDataAssetConsoleVariables.h"
 
-#include "JsonDataAssetGlobals.h"
 #include "JsonDataAssetSubsystem.h"
 
 namespace OUU::JsonData::Runtime::Private

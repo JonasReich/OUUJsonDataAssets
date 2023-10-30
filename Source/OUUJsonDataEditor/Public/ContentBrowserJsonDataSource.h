@@ -82,16 +82,17 @@ struct FContentBrowserJsonDataSource
 	~FContentBrowserJsonDataSource();
 
 	// To be used both for source files and also the generated uassets.
-	void PopulateJsonFileContextMenu(UToolMenu* ContextMenu);
+	void PopulateJsonFileContextMenu(UToolMenu* ContextMenu) const;
 
 private:
 	TStrongObjectPtr<UContentBrowserFileDataSource> JsonFileDataSource;
 	TSharedPtr<FJsonFileSourceControlContextMenu> SourceControlContextMenu;
 
 	TArray<TSharedRef<const FContentBrowserFileItemDataPayload>> GetSelectedFiles(
-		const UContentBrowserDataMenuContext_FileMenu* ContextObject);
+		const UContentBrowserDataMenuContext_FileMenu* ContextObject) const;
 
-	TArray<FAssetIdentifier> GetContentBrowserSelectedJsonAssets(FOnContentBrowserGetSelection GetSelectionDelegate);
+	TArray<FAssetIdentifier> GetContentBrowserSelectedJsonAssets(
+		const FOnContentBrowserGetSelection& GetSelectionDelegate);
 
 	bool ItemPassesFilter(
 		const FName InFilePath,
@@ -106,5 +107,5 @@ private:
 		const FName InAttributeKey,
 		FContentBrowserItemDataAttributeValue& OutAttributeValue);
 
-	bool CreateNewJsonAssetWithClass(const FString& PackagePath, UClass* AssetClass);
+	bool CreateNewJsonAssetWithClass(const FString& PackagePath, const UClass* AssetClass);
 };

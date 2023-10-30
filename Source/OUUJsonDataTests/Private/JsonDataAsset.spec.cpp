@@ -38,7 +38,7 @@ BEGIN_DEFINE_SPEC(
 			return StructObject;
 		};
 
-		auto InlineStructObject = CreateStructJsonObject(
+		const auto InlineStructObject = CreateStructJsonObject(
 			"Overridden String in Struct",
 			"/Script/Engine.Texture2D'/Engine/EngineMaterials/DefaultNormal.DefaultNormal'",
 			"/JsonData/Plugins/OUUJsonDataAssets/Tests/TestAsset_NoValuesSet");
@@ -108,7 +108,7 @@ BEGIN_DEFINE_SPEC(
 			SPEC_TEST_EQUAL(TestAsset->String, "Overridden String");
 			if (SPEC_TEST_NOT_NULL(TestAsset->Object))
 			{
-				FSoftObjectPath ObjectPath(
+				const FSoftObjectPath ObjectPath(
 					"/Script/Engine.Material'/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial'");
 				auto* LoadedObject = ObjectPath.TryLoad();
 				SPEC_TEST_EQUAL(LoadedObject, TestAsset->Object);
@@ -117,8 +117,8 @@ BEGIN_DEFINE_SPEC(
 			auto TestStruct = [this](
 								  const FTestJsonDataAssetStruct& TestStruct,
 								  FString ExpectedString,
-								  FString ExpectedObjectPath,
-								  FString ExpectedJsonPath) {
+								  const FString& ExpectedObjectPath,
+								  const FString& ExpectedJsonPath) {
 				FTestJsonDataAssetStruct ExpectedStruct;
 				ExpectedStruct.String = ExpectedString;
 				ExpectedStruct.JsonPath = FJsonDataAssetPath::FromPackagePath(ExpectedJsonPath);
@@ -176,15 +176,15 @@ END_DEFINE_SPEC(FJsonDataAssetSpec)
 
 void FJsonDataAssetSpec::Define()
 {
-	Describe("UtilFuncs", [this]() {
+	Describe("UtilFunctions", [this]() {
 		Describe("PackageToObjectName", [this]() {
 			It("should return the package name for a package path", [this]() {
-				auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(TEXT("/JsonData/Folder/PackageName"));
+				const auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(TEXT("/JsonData/Folder/PackageName"));
 				SPEC_TEST_EQUAL(ObjectName, TEXT("PackageName"));
 			});
 
 			It("should return an empty string for a string that does not contain slashes", [this]() {
-				auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(TEXT("ObjectName"));
+				const auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(TEXT("ObjectName"));
 				SPEC_TEST_EQUAL(ObjectName, TEXT(""));
 			});
 		});
@@ -192,20 +192,20 @@ void FJsonDataAssetSpec::Define()
 		Describe("Package/Source Conversion", [this]() {
 			Describe("in Read mode", [this]() {
 				It("should return the same path", [this]() {
-					auto PackagePath = TEXT("/JsonData/Folder/PackageName");
-					auto SourcePath =
+					const auto PackagePath = TEXT("/JsonData/Folder/PackageName");
+					const auto SourcePath =
 						OUU::JsonData::Runtime::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Read);
-					auto PackagePathResult =
+					const auto PackagePathResult =
 						OUU::JsonData::Runtime::SourceFullToPackage(SourcePath, EJsonDataAccessMode::Read);
 					SPEC_TEST_EQUAL(PackagePath, PackagePathResult);
 				});
 			});
 			Describe("in Write mode", [this]() {
 				It("should return the same path", [this]() {
-					auto PackagePath = TEXT("/JsonData/Folder/PackageName");
-					auto SourcePath =
+					const auto PackagePath = TEXT("/JsonData/Folder/PackageName");
+					const auto SourcePath =
 						OUU::JsonData::Runtime::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Write);
-					auto PackagePathResult =
+					const auto PackagePathResult =
 						OUU::JsonData::Runtime::SourceFullToPackage(SourcePath, EJsonDataAccessMode::Write);
 					SPEC_TEST_EQUAL(PackagePath, PackagePathResult);
 				});
@@ -223,7 +223,7 @@ void FJsonDataAssetSpec::Define()
 		});
 
 		It("should return true for assets loaded from paths", [this]() {
-			auto TestAsset = FJsonDataAssetPath::FromPackagePath(UTestJsonDataAsset::GetTestPath()).LoadSynchronous();
+			const auto TestAsset = FJsonDataAssetPath::FromPackagePath(UTestJsonDataAsset::GetTestPath()).LoadSynchronous();
 			if (SPEC_TEST_NOT_NULL(TestAsset))
 			{
 				SPEC_TEST_TRUE(TestAsset->IsFileBasedJsonAsset());
@@ -233,33 +233,33 @@ void FJsonDataAssetSpec::Define()
 
 	Describe("GetPath", [this]() {
 		It("should return the path it was loaded from", [this]() {
-			auto LoadPath = UTestJsonDataAsset::GetTestPath();
-			auto TestAsset = FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous();
+			const auto LoadPath = UTestJsonDataAsset::GetTestPath();
+			const auto TestAsset = FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous();
 			if (SPEC_TEST_NOT_NULL(TestAsset))
 			{
-				auto ResultPath = TestAsset->GetPath().GetPackagePath();
+				const auto ResultPath = TestAsset->GetPath().GetPackagePath();
 				SPEC_TEST_EQUAL(ResultPath, LoadPath);
 			}
 		});
 
 		It("should return a path matching to the generated package path name", [this]() {
-			auto LoadPath = UTestJsonDataAsset::GetTestPath();
-			auto TestAsset = FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous();
+			const auto LoadPath = UTestJsonDataAsset::GetTestPath();
+			const auto TestAsset = FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous();
 			if (SPEC_TEST_NOT_NULL(TestAsset))
 			{
-				auto ResultPath = TestAsset->GetPath().GetPackagePath();
-				auto PackagePathName = TestAsset->GetPackage()->GetPathName();
+				const auto ResultPath = TestAsset->GetPath().GetPackagePath();
+				const auto PackagePathName = TestAsset->GetPackage()->GetPathName();
 				SPEC_TEST_EQUAL(ResultPath, PackagePathName);
 			}
 		});
 
 		It("should return a path equal to one constructed from this ptr", [this]() {
-			auto LoadPath = UTestJsonDataAsset::GetTestPath();
-			auto TestAsset = FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous();
+			const auto LoadPath = UTestJsonDataAsset::GetTestPath();
+			const auto TestAsset = FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous();
 			if (SPEC_TEST_NOT_NULL(TestAsset))
 			{
-				auto ResultPath = TestAsset->GetPath();
-				auto PathFromThis = FJsonDataAssetPath(TestAsset);
+				const auto ResultPath = TestAsset->GetPath();
+				const auto PathFromThis = FJsonDataAssetPath(TestAsset);
 				SPEC_TEST_EQUAL(ResultPath, PathFromThis);
 			}
 		});
@@ -267,13 +267,13 @@ void FJsonDataAssetSpec::Define()
 
 	Describe("Loaded values from disk", [this]() {
 		It("should equal to CDO values if the json text does not contain any data values", [this]() {
-			auto LoadPath = UTestJsonDataAsset::GetTestPath_NoValuesSet();
-			auto TestAsset = Cast<UTestJsonDataAsset>(FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous());
+			const auto LoadPath = UTestJsonDataAsset::GetTestPath_NoValuesSet();
+			const auto TestAsset = Cast<UTestJsonDataAsset>(FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous());
 			TestNoValuesSet(TestAsset);
 		});
 		It("should equal to expected values all values are set", [this]() {
-			auto LoadPath = UTestJsonDataAsset::GetTestPath_AllValuesSet();
-			auto TestAsset = Cast<UTestJsonDataAsset>(FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous());
+			const auto LoadPath = UTestJsonDataAsset::GetTestPath_AllValuesSet();
+			const auto TestAsset = Cast<UTestJsonDataAsset>(FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous());
 			TestAllValuesSet(TestAsset);
 		});
 	});
@@ -281,7 +281,7 @@ void FJsonDataAssetSpec::Define()
 	Describe("ImportJson", [this]() {
 		It("should equal to CDO values if the json object does not have any data members", [this]() {
 			auto* TestAsset = NewObject<UTestJsonDataAsset>();
-			auto JsonObject = MakeShared<FJsonObject>();
+			const auto JsonObject = MakeShared<FJsonObject>();
 			JsonObject->SetStringField("Class", "/Script/OUUJsonDataTests.TestJsonDataAsset");
 			// version should not be required, so we omit it here to keep the test simpler
 			JsonObject->SetObjectField("Data", MakeShared<FJsonObject>());
@@ -289,7 +289,7 @@ void FJsonDataAssetSpec::Define()
 			TestNoValuesSet(TestAsset);
 		});
 		It("should equal to expected values all values are set", [this]() {
-			auto JsonObject = MakeTestJsonObject();
+			const auto JsonObject = MakeTestJsonObject();
 			JsonObject->SetObjectField("Data", MakeDataJsonObject_AllValues());
 
 			auto* TestAsset = NewObject<UTestJsonDataAsset>();
@@ -301,31 +301,31 @@ void FJsonDataAssetSpec::Define()
 
 	Describe("ExportJson", [this]() {
 		It("should return empty data object for object with default values", [this]() {
-			auto LoadPath = UTestJsonDataAsset::GetTestPath_NoValuesSet();
-			auto TestAsset = Cast<UTestJsonDataAsset>(FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous());
+			const auto LoadPath = UTestJsonDataAsset::GetTestPath_NoValuesSet();
+			const auto TestAsset = Cast<UTestJsonDataAsset>(FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous());
 			if (SPEC_TEST_NOT_NULL(TestAsset))
 			{
-				auto JsonObject = TestAsset->ExportJson();
+				const auto JsonObject = TestAsset->ExportJson();
 				const TSharedPtr<FJsonObject>* JsonDataObject = nullptr;
 				if (SPEC_TEST_TRUE(JsonObject->TryGetObjectField("Data", OUT JsonDataObject)))
 				{
-					auto EmptyJsonObject = MakeShared<FJsonValueObject>(nullptr);
-					auto JsonObjectValue = MakeShared<FJsonValueObject>(*EmptyJsonObject);
+					const auto EmptyJsonObject = MakeShared<FJsonValueObject>(nullptr);
+					const auto JsonObjectValue = MakeShared<FJsonValueObject>(*EmptyJsonObject);
 					SPEC_TEST_TRUE(FJsonValue::CompareEqual(*JsonObjectValue, *EmptyJsonObject));
 				}
 			}
 		});
 		It("should return expected data object for object with all set values", [this]() {
-			auto LoadPath = UTestJsonDataAsset::GetTestPath_NoValuesSet();
-			auto TestAsset = Cast<UTestJsonDataAsset>(FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous());
+			const auto LoadPath = UTestJsonDataAsset::GetTestPath_NoValuesSet();
+			const auto TestAsset = Cast<UTestJsonDataAsset>(FJsonDataAssetPath::FromPackagePath(LoadPath).LoadSynchronous());
 			if (SPEC_TEST_NOT_NULL(TestAsset))
 			{
-				auto JsonObject = TestAsset->ExportJson();
+				const auto JsonObject = TestAsset->ExportJson();
 				const TSharedPtr<FJsonObject>* JsonDataObject = nullptr;
 				if (SPEC_TEST_TRUE(JsonObject->TryGetObjectField("Data", OUT JsonDataObject)))
 				{
-					auto EmptyJsonObject = MakeShared<FJsonValueObject>(MakeDataJsonObject_AllValues());
-					auto JsonObjectValue = MakeShared<FJsonValueObject>(*EmptyJsonObject);
+					const auto EmptyJsonObject = MakeShared<FJsonValueObject>(MakeDataJsonObject_AllValues());
+					const auto JsonObjectValue = MakeShared<FJsonValueObject>(*EmptyJsonObject);
 					SPEC_TEST_TRUE(FJsonValue::CompareEqual(*JsonObjectValue, *EmptyJsonObject));
 				}
 			}

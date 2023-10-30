@@ -61,6 +61,7 @@ public:
 	/**
 	 * Import json object into properties.
 	 * This may fail if either the format of the json object is not correct or properties cannot be resolved.
+	 * @param	JsonObject				JsonObject containing properties to import
 	 * @param	bCheckClassMatches		If true, it's checked that the class metadata is an exact match to this
 	 * class.
 	 * @returns	if import was successful
@@ -102,7 +103,7 @@ public:
 protected:
 	// Check whether we need to handle the given PostRename event. This can return false e.g. if the object is only
 	// being reinstanced.
-	bool MustHandleRename(UObject* OldOuter, const FName OldName) const;
+	bool MustHandleRename(const UObject* OldOuter, const FName OldName) const;
 
 	// Get a list of additional custom version identifiers used by this object (Versions added via UsingCustomVersion
 	// during any Serialize calls will be added automatically)
@@ -129,7 +130,7 @@ public:
 	bool IsSupportedForNetworking() const override;
 
 #if WITH_EDITOR
-	virtual EDataValidationResult IsDataValid(class FDataValidationContext& Context) override;
+	EDataValidationResult IsDataValid(class FDataValidationContext& Context) override;
 #endif
 
 private:

@@ -53,11 +53,11 @@ public:
 	}
 
 	// - FFrontendFilter
-	virtual FString GetName() const override { return TEXT("ShowGeneratedJsonAssets"); }
-	virtual FText GetDisplayName() const override { return INVTEXT("Show Generated Json Data Assets"); }
-	virtual FText GetToolTipText() const override { return INVTEXT("Allow display of generated Json Data Assets."); }
-	virtual bool IsInverseFilter() const override { return true; }
-	virtual void SetCurrentFilter(TArrayView<const FName> InSourcePaths, const FContentBrowserDataFilter& InBaseFilter)
+	FString GetName() const override { return TEXT("ShowGeneratedJsonAssets"); }
+	FText GetDisplayName() const override { return INVTEXT("Show Generated Json Data Assets"); }
+	FText GetToolTipText() const override { return INVTEXT("Allow display of generated Json Data Assets."); }
+	bool IsInverseFilter() const override { return true; }
+	void SetCurrentFilter(TArrayView<const FName> InSourcePaths, const FContentBrowserDataFilter& InBaseFilter)
 		override
 	{
 		const FContentBrowserDataClassFilter* ClassFilter =
@@ -81,7 +81,7 @@ public:
 	// --
 
 	// - IFilter
-	virtual bool PassesFilter(FAssetFilterType InItem) const override
+	bool PassesFilter(FAssetFilterType InItem) const override
 	{
 		RefreshJsonClassPaths();
 

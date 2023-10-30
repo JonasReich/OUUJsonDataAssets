@@ -2,10 +2,8 @@
 
 #include "JsonLibrary.h"
 
-// GRIMLORE Start dlehn: Custom handling for gameplay tags and containers
 #include "GameplayTagContainer.h"
 #include "GameplayTagsManager.h"
-// GRIMLORE End
 #include "JsonDataCustomVersions.h"
 #include "JsonUtilities.h"
 #include "LogJsonDataAsset.h"
@@ -49,10 +47,10 @@ struct FOUUPropertyJsonResult
 	TSharedPtr<FJsonValue> Value;
 
 	static FOUUPropertyJsonResult Skip() { return FOUUPropertyJsonResult(true, {}); }
-	static FOUUPropertyJsonResult Json(TSharedPtr<FJsonValue> Value) { return FOUUPropertyJsonResult(false, Value); }
+	static FOUUPropertyJsonResult Json(const TSharedPtr<FJsonValue>& Value) { return FOUUPropertyJsonResult(false, Value); }
 
 private:
-	FOUUPropertyJsonResult(bool bSkip, TSharedPtr<FJsonValue> Value) : bSkip(bSkip), Value(Value) {}
+	FOUUPropertyJsonResult(bool bSkip, const TSharedPtr<FJsonValue>& Value) : bSkip(bSkip), Value(Value) {}
 };
 
 struct FJsonLibraryExportHelper
@@ -60,7 +58,7 @@ struct FJsonLibraryExportHelper
 	FJsonLibraryExportHelper(
 		int64 InCheckFlags,
 		int64 InSkipFlags,
-		FOUUJsonLibraryObjectFilter InSubObjectFilter,
+		const FOUUJsonLibraryObjectFilter& InSubObjectFilter,
 		bool bInOnlyModifiedProperties) :
 		DefaultCheckFlags(InCheckFlags),
 		DefaultSkipFlags(InSkipFlags),
@@ -87,7 +85,7 @@ struct FJsonLibraryExportHelper
 		return CustomCB;
 	}
 
-	bool SkipPropertyMatchingDefaultValues(FProperty* Property, const void* Value, const void* DefaultValue) const
+	bool SkipPropertyMatchingDefaultValues(const FProperty* Property, const void* Value, const void* DefaultValue) const
 	{
 		if (bOnlyModifiedProperties == false)
 		{
@@ -324,12 +322,12 @@ struct FJsonLibraryExportHelper
 			// but no EXPORTTextItem, so we have to handle this manually.
 			if (StructProperty->Struct->IsChildOf(FGameplayTag::StaticStruct()))
 			{
-				const auto& Tag = *(const FGameplayTag*)Value;
+				const auto& Tag = *StaticCast<const FGameplayTag*>(Value);
 				return FOUUPropertyJsonResult::Json(MakeShared<FJsonValueString>(Tag.ToString()));
 			}
 			else if (StructProperty->Struct->IsChildOf(FGameplayTagContainer::StaticStruct()))
 			{
-				const auto& Container = *(const FGameplayTagContainer*)Value;
+				const auto& Container = *StaticCast<const FGameplayTagContainer*>(Value);
 				TArray<TSharedPtr<FJsonValue>> Values;
 				Values.Reserve(Container.Num());
 				for (const auto& Tag : Container)
@@ -445,8 +443,8 @@ struct FJsonLibraryExportHelper
 		{
 			auto ArrayElement = ConvertScalarFPropertyToJsonValue(
 				Property,
-				(char*)Value + Index * Property->ElementSize,
-				DefaultValue ? (char*)DefaultValue + Index + Property->ElementSize : nullptr,
+				StaticCast<const char*>(Value) + Index * Property->ElementSize,
+				DefaultValue ? StaticCast<const char*>(DefaultValue) + Index + Property->ElementSize : nullptr,
 				Index,
 				CheckFlags,
 				SkipFlags,
@@ -484,7 +482,7 @@ struct FJsonLibraryExportHelper
 		if (StructDefinition == FJsonObjectWrapper::StaticStruct())
 		{
 			// Just copy it into the object
-			const FJsonObjectWrapper* ProxyObject = (const FJsonObjectWrapper*)Struct;
+			const FJsonObjectWrapper* ProxyObject = StaticCast<const FJsonObjectWrapper*>(Struct);
 
 			if (ProxyObject->JsonObject.IsValid())
 			{
@@ -513,7 +511,7 @@ struct FJsonLibraryExportHelper
 			const void* DefaultValue = DefaultStruct ? Property->ContainerPtrToValuePtr<uint8>(DefaultStruct) : nullptr;
 
 			// convert the property to a FJsonValue
-			auto PropertyResult = UPropertyToJsonValue(Property, Value, DefaultValue, CheckFlags, SkipFlags, ExportCb);
+			const auto PropertyResult = UPropertyToJsonValue(Property, Value, DefaultValue, CheckFlags, SkipFlags, ExportCb);
 			if (PropertyResult.bSkip)
 				continue;
 
@@ -522,7 +520,7 @@ struct FJsonLibraryExportHelper
 			TSharedPtr<FJsonValue> JsonValue = PropertyResult.Value;
 			if (!JsonValue.IsValid())
 			{
-				FFieldClass* PropClass = Property->GetClass();
+				const FFieldClass* PropClass = Property->GetClass();
 				UE_LOG(
 					LogJsonDataAsset,
 					Error,
@@ -565,8 +563,9 @@ struct FJsonLibraryExportHelper
 	}
 
 	TSharedPtr<FJsonObject> ConvertStructToJsonObject(const void* Data, const void* DefaultData, const UStruct* Struct)
+		const
 	{
-		FJsonObjectConverter::CustomExportCallback CustomCB = GetCustomCallback();
+		const FJsonObjectConverter::CustomExportCallback CustomCB = GetCustomCallback();
 		TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
 		bool MinimumOneValueSet = false;
 		if (UStructToJsonObject(
@@ -584,9 +583,9 @@ struct FJsonLibraryExportHelper
 		return TSharedPtr<FJsonObject>();
 	}
 
-	TSharedPtr<FJsonObject> ConvertObjectToJsonObject(const UObject* Object)
+	TSharedPtr<FJsonObject> ConvertObjectToJsonObject(const UObject* Object) const
 	{
-		FJsonObjectConverter::CustomExportCallback CustomCB = GetCustomCallback();
+		const FJsonObjectConverter::CustomExportCallback CustomCB = GetCustomCallback();
 		TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
 		bool MinimumOneValueSet = false;
 		if (UStructToJsonObject(
@@ -633,7 +632,7 @@ struct FJsonLibraryExportHelper
 	template <bool bPrettyPrint>
 	FString ConvertObjectToString(const UObject* Object)
 	{
-		TSharedPtr<FJsonObject> JsonObject = ConvertObjectToJsonObject(Object);
+		const TSharedPtr<FJsonObject> JsonObject = ConvertObjectToJsonObject(Object);
 		if (JsonObject.IsValid())
 		{
 			FString JsonString;
@@ -772,7 +771,7 @@ struct FJsonLibraryImportHelper
 			else
 			{
 				// AsNumber will log an error for completely inappropriate types (then give us a default)
-				EnumProperty->GetUnderlyingProperty()->SetIntPropertyValue(OutValue, (int64)JsonValue->AsNumber());
+				EnumProperty->GetUnderlyingProperty()->SetIntPropertyValue(OutValue, StaticCast<int64>(JsonValue->AsNumber()));
 			}
 		}
 		else if (FNumericProperty* NumericProperty = CastField<FNumericProperty>(Property))
@@ -821,7 +820,7 @@ struct FJsonLibraryImportHelper
 				else
 				{
 					// AsNumber will log an error for completely inappropriate types (then give us a default)
-					NumericProperty->SetIntPropertyValue(OutValue, (int64)JsonValue->AsNumber());
+					NumericProperty->SetIntPropertyValue(OutValue, static_cast<int64>(JsonValue->AsNumber()));
 				}
 			}
 			else
@@ -1168,7 +1167,7 @@ struct FJsonLibraryImportHelper
 			}
 			else if (JsonValue->Type == EJson::String && StructProperty->Struct->GetFName() == NAME_LinearColor)
 			{
-				FLinearColor& ColorOut = *(FLinearColor*)OutValue;
+				FLinearColor& ColorOut = *StaticCast<FLinearColor*>(OutValue);
 				FString ColorString = JsonValue->AsString();
 
 				FColor IntermediateColor;
@@ -1178,7 +1177,7 @@ struct FJsonLibraryImportHelper
 			}
 			else if (JsonValue->Type == EJson::String && StructProperty->Struct->GetFName() == NAME_Color)
 			{
-				FColor& ColorOut = *(FColor*)OutValue;
+				FColor& ColorOut = *StaticCast<FColor*>(OutValue);
 				FString ColorString = JsonValue->AsString();
 
 				ColorOut = FColor::FromHex(ColorString);
@@ -1186,7 +1185,7 @@ struct FJsonLibraryImportHelper
 			else if (JsonValue->Type == EJson::String && StructProperty->Struct->GetFName() == NAME_DateTime)
 			{
 				FString DateString = JsonValue->AsString();
-				FDateTime& DateTimeOut = *(FDateTime*)OutValue;
+				FDateTime& DateTimeOut = *StaticCast<FDateTime*>(OutValue);
 				if (DateString == TEXT("min"))
 				{
 					// min representable value for our date struct. Actual date may vary by platform (this is used for
@@ -1307,7 +1306,7 @@ struct FJsonLibraryImportHelper
 				UObject* Outer = GetTransientPackage();
 				if (ContainerStruct->IsChildOf(UObject::StaticClass()))
 				{
-					Outer = (UObject*)Container;
+					Outer = StaticCast<UObject*>(Container);
 				}
 
 				TSharedPtr<FJsonObject> Obj = JsonValue->AsObject();
@@ -1682,7 +1681,7 @@ bool FJsonLibraryImportHelper::JsonValueToFPropertyWithContainer(
 	{
 		if (StructProperty->Struct->IsChildOf(FGameplayTagContainer::StaticStruct()))
 		{
-			auto& TagContainer = *(FGameplayTagContainer*)OutValue;
+			auto& TagContainer = *static_cast<FGameplayTagContainer*>(OutValue);
 			TagContainer.Reset();
 			const auto& JsonArray = JsonValue->AsArray();
 			for (const auto& JsonTagValue : JsonArray)
@@ -1733,7 +1732,7 @@ bool FJsonLibraryImportHelper::JsonValueToFPropertyWithContainer(
 		if (!ConvertScalarJsonValueToFPropertyWithContainer(
 				ArrayValue[Index],
 				Property,
-				static_cast<char*>(OutValue) + Index * Property->ElementSize,
+				StaticCast<char*>(OutValue) + Index * Property->ElementSize,
 				ContainerStruct,
 				Container,
 				VersionLoadingArchive,
@@ -1763,7 +1762,7 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 	if (StructDefinition == FJsonObjectWrapper::StaticStruct())
 	{
 		// Just copy it into the object
-		FJsonObjectWrapper* ProxyObject = (FJsonObjectWrapper*)OutStruct;
+		FJsonObjectWrapper* ProxyObject = StaticCast<FJsonObjectWrapper*>(OutStruct);
 		ProxyObject->JsonObject = MakeShared<FJsonObject>();
 		ProxyObject->JsonObject->Values = JsonAttributes;
 		return true;
@@ -1861,7 +1860,7 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 	// GRIMLORE Start dlehn: Ensure objects loaded from json receive PostLoad calls
 	if (StructDefinition->IsChildOf<UObject>())
 	{
-		const auto pObject = static_cast<UObject*>(OutStruct);
+		const auto pObject = StaticCast<UObject*>(OutStruct);
 		if (pObject->HasAnyFlags(RF_NeedPostLoad) == false)
 		{
 			pObject->SetFlags(RF_NeedPostLoad);
@@ -1883,7 +1882,7 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 	// ExportTextItem function. So we have to manually do what they would otherwise do during import.
 	if (StructDefinition->IsChildOf(FGameplayTagContainer::StaticStruct()))
 	{
-		auto& TagContainer = *(FGameplayTagContainer*)OutStruct;
+		auto& TagContainer = *StaticCast<FGameplayTagContainer*>(OutStruct);
 		// Remove invalid tags. Unfortunately there is no public function to remove all invalid tags at once.
 		while (TagContainer.RemoveTag(FGameplayTag(), true))
 		{
@@ -1899,8 +1898,8 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 TSharedPtr<FJsonObject> UOUUJsonLibrary::UStructToJsonObject(
 	const void* Data,
 	const void* DefaultData,
-	UStruct* Struct,
-	FOUUJsonLibraryObjectFilter SubObjectFilter,
+	const UStruct* Struct,
+	const FOUUJsonLibraryObjectFilter& SubObjectFilter,
 	int64 CheckFlags /* = 0 */,
 	int64 SkipFlags /* = 0 */,
 	bool bOnlyModifiedProperties /* = false */)
@@ -1936,7 +1935,7 @@ TSharedPtr<FJsonValue> UOUUJsonLibrary::UPropertyToJsonValue(
 	const void* PropertyData,
 	const void* DefaultPropertyData,
 	FProperty* Property,
-	FOUUJsonLibraryObjectFilter SubObjectFilter,
+	const FOUUJsonLibraryObjectFilter& SubObjectFilter,
 	int64 CheckFlags /* = 0 */,
 	int64 SkipFlags /* = 0 */,
 	bool bOnlyModifiedProperties /* = false */)
@@ -1952,7 +1951,7 @@ TSharedPtr<FJsonValue> UOUUJsonLibrary::UPropertyToJsonValue(
 }
 
 bool UOUUJsonLibrary::JsonValueToUProperty(
-	TSharedRef<FJsonValue> JsonValue,
+	const TSharedRef<FJsonValue>& JsonValue,
 	void* PropertyData,
 	FProperty* Property,
 	const FArchive& VersionLoadingArchive,

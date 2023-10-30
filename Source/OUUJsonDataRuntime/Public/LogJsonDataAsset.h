@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 
+// ReSharper disable CppUnusedIncludeDirective
 #include "Logging/MessageLog.h"
 #include "Misc/UObjectToken.h"
+// ReSharper restore CppUnusedIncludeDirective
 
 OUUJSONDATARUNTIME_API DECLARE_LOG_CATEGORY_EXTERN(LogJsonDataAsset, Log, All);
 

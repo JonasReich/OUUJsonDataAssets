@@ -16,7 +16,7 @@ public:
 	/** Makes the context menu widget */
 	void MakeContextMenu(
 		UToolMenu* InMenu,
-		TArray<TSharedRef<const FContentBrowserFileItemDataPayload>>& InSelectedFiles);
+		const TArray<TSharedRef<const FContentBrowserFileItemDataPayload>>& InSelectedFiles);
 
 private:
 	void AddMenuOptions(UToolMenu* Menu);
@@ -29,15 +29,15 @@ private:
 	bool CanExecuteDiffSelected() const;
 
 	void ExecuteEnableSourceControl();
-	void ExecuteSCCRefresh();
+	void ExecuteSCCRefresh() const;
 	void ExecuteDiffSelected() const;
-	void ExecuteSCCCheckOut();
-	void ExecuteSCCOpenForAdd();
-	void ExecuteSCCCheckIn();
-	void ExecuteSCCHistory();
+	void ExecuteSCCCheckOut() const;
+	void ExecuteSCCOpenForAdd() const;
+	void ExecuteSCCCheckIn() const;
+	void ExecuteSCCHistory() const;
 	void ExecuteSCCDiffAgainstDepot() const;
-	void ExecuteSCCRevert();
-	void ExecuteSCCSync();
+	void ExecuteSCCRevert() const;
+	void ExecuteSCCSync() const;
 
 	void GetSelectedFileNames(TArray<FString>& OutFileNames) const;
 

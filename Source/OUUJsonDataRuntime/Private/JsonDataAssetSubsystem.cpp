@@ -86,14 +86,14 @@ namespace OUU::JsonData::Runtime
 
 	FString PackageToDataRelative(const FString& PackagePath)
 	{
-		auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForPackagePath(PackagePath);
+		const auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForPackagePath(PackagePath);
 		return PackagePath.Replace(*GetCacheMountPointRoot_Package(RootName), TEXT("")).Append(TEXT(".json"));
 	}
 
 	FString PackageToSourceFull(const FString& PackagePath, EJsonDataAccessMode AccessMode)
 	{
-		auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForPackagePath(PackagePath);
-		auto Path = FPaths::ProjectDir() / GetSourceRoot_ProjectRelative(RootName, AccessMode)
+		const auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForPackagePath(PackagePath);
+		const auto Path = FPaths::ProjectDir() / GetSourceRoot_ProjectRelative(RootName, AccessMode)
 			/ PackageToDataRelative(PackagePath);
 		return FPaths::ConvertRelativePathToFull(Path);
 	}
@@ -101,7 +101,7 @@ namespace OUU::JsonData::Runtime
 	// Take a path that is relative to the project root and convert it into a package path.
 	FString SourceFullToPackage(const FString& FullPath, EJsonDataAccessMode AccessMode)
 	{
-		auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForSourcePath(FullPath);
+		const auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForSourcePath(FullPath);
 
 		auto RelativeToSource = FullPath;
 		ensure(FPaths::MakePathRelativeTo(
@@ -114,7 +114,7 @@ namespace OUU::JsonData::Runtime
 	FString PackageToObjectName(const FString& Package)
 	{
 		int32 Idx = INDEX_NONE;
-		if (!Package.FindLastChar(TCHAR('/'), OUT Idx))
+		if (!Package.FindLastChar('/', OUT Idx))
 			return "";
 		return Package.RightChop(Idx + 1);
 	}
@@ -227,6 +227,7 @@ void UJsonDataAssetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	// I know, disabling deprecation warnings is shit, but this is easy to fix when it eventually breaks.
 	// And having it delegate based is cleaner (and hopefully possible in 5.2) via ModifyCookDelegate,
 	// which seems to be accidentally left private in 5.0 / 5.1
+	// ReSharper disable once CppDeprecatedEntity
 	FGameDelegates::Get().GetCookModificationDelegate().BindUObject(this, &UJsonDataAssetSubsystem::ModifyCook);
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #endif
@@ -388,7 +389,7 @@ void UJsonDataAssetSubsystem::ImportAllAssets(bool bOnlyMissing)
 		RescanAllAssets();
 	}
 
-	bool bIgnoreErrorsDuringImport =
+	const bool bIgnoreErrorsDuringImport =
 		OUU::JsonData::Runtime::Private::CVar_IgnoreLoadErrorsDuringStartupImport.GetValueOnAnyThread();
 
 	if (bIgnoreErrorsDuringImport)
@@ -430,7 +431,8 @@ void UJsonDataAssetSubsystem::RescanAllAssets()
 		PlatformFile.IterateDirectoryRecursively(*SourceRoot, [&](const TCHAR* FilePath, bool bIsDirectory) -> bool {
 			if (bIsDirectory == false)
 			{
-				auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
+				const auto PackagePath =
+					OUU::JsonData::Runtime::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
 				AllJsonDataAssetsByIndex.Add(FName(PackagePath));
 			}
 			return true;
@@ -476,10 +478,8 @@ void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyM
 	TArray<UPackage*> AllPackages;
 	int32 NumPackagesLoaded = 0;
 	int32 NumPackagesFailedToLoad = 0;
-	auto VisitorLambda = [&AllPackages,
-						  &NumPackagesLoaded,
-						  &NumPackagesFailedToLoad,
-						  bOnlyMissing](const TCHAR* FilePath, bool bIsDirectory) -> bool {
+	auto VisitorLambda =
+		[&NumPackagesLoaded, &NumPackagesFailedToLoad, bOnlyMissing](const TCHAR* FilePath, bool bIsDirectory) -> bool {
 		if (bIsDirectory)
 			return true;
 
@@ -490,8 +490,8 @@ void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyM
 				UE_JSON_DATA_MESSAGELOG(
 					Warning,
 					nullptr,
-					TEXT("File %sin Data directory has an unexpected file extension."),
-					*FilePath);
+					TEXT("File %s in Data directory has an unexpected file extension."),
+					FilePath);
 				NumPackagesFailedToLoad++;
 			}
 			// Continue with other files anyways
@@ -507,14 +507,14 @@ void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyM
 					nullptr,
 					TEXT("File %s in Data directory has two '.' characters in it's filename. Only a simple '.json' "
 						 "extension is allowed."),
-					*FilePath);
+					FilePath);
 				NumPackagesFailedToLoad++;
 			}
 			// Continue with other files anyways
 			return true;
 		}
 
-		auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
+		const auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
 
 		FString PackageFilename;
 		const bool bPackageAlreadyExists = FPackageName::DoesPackageExist(PackagePath, &PackageFilename);
@@ -555,7 +555,7 @@ void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyM
 			FSavePackageArgs SaveArgs;
 			SaveArgs.TopLevelFlags = RF_Standalone;
 			SaveArgs.Error = GWarn;
-			auto SaveResult = UPackage::Save(NewPackage, NewDataAsset, *PackageFilename, SaveArgs);
+			const auto SaveResult = UPackage::Save(NewPackage, NewDataAsset, *PackageFilename, SaveArgs);
 
 			if (SaveResult == ESavePackageResult::Success)
 			{
@@ -576,7 +576,7 @@ void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyM
 		return true;
 	};
 
-	IPlatformFile::FDirectoryVisitorFunc VisitorFunc = VisitorLambda;
+	const IPlatformFile::FDirectoryVisitorFunc VisitorFunc = VisitorLambda;
 
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 	PlatformFile.IterateDirectoryRecursively(*JsonDir, VisitorFunc);
@@ -605,7 +605,7 @@ void UJsonDataAssetSubsystem::AddPluginDataRoot(const FName& PluginName)
 	}
 
 	auto& PluginManager = IPluginManager::Get();
-	if (auto Plugin = PluginManager.FindPlugin(*PluginName.ToString()))
+	if (const auto Plugin = PluginManager.FindPlugin(*PluginName.ToString()))
 	{
 		const auto PluginBaseDir = Plugin->GetBaseDir();
 
@@ -815,8 +815,8 @@ void UJsonDataAssetSubsystem::CleanupAssetCache(const FName& RootName)
 			return true;
 		}
 
-		auto FilePathStr = FStringView(FilePath);
-		auto AssetExtension = FPackageName::GetAssetPackageExtension();
+		const auto FilePathStr = FStringView(FilePath);
+		const auto AssetExtension = FPackageName::GetAssetPackageExtension();
 		if (FilePathStr.EndsWith(AssetExtension) == false)
 		{
 			UE_LOG(
@@ -829,7 +829,7 @@ void UJsonDataAssetSubsystem::CleanupAssetCache(const FName& RootName)
 		}
 
 		FString RelativePath = FilePath;
-		bool bIsRelative = FPaths::MakePathRelativeTo(IN OUT RelativePath, *FString(MountDiskPath + TEXT("/")));
+		const bool bIsRelative = FPaths::MakePathRelativeTo(IN OUT RelativePath, *FString(MountDiskPath + TEXT("/")));
 		ensureMsgf(bIsRelative, TEXT("File path %s must be in subdirectory of %s"), *FilePath, *MountDiskPath);
 		ensureMsgf(
 			RelativePath.StartsWith(TEXT("./")) == false,
@@ -838,9 +838,9 @@ void UJsonDataAssetSubsystem::CleanupAssetCache(const FName& RootName)
 
 		RelativePath = RelativePath.Mid(0, RelativePath.Len() - AssetExtension.Len());
 
-		auto PackagePath = OUU::JsonData::Runtime::GetCacheMountPointRoot_Package(RootName).Append(RelativePath);
+		const auto PackagePath = OUU::JsonData::Runtime::GetCacheMountPointRoot_Package(RootName).Append(RelativePath);
 
-		auto SourcePath = OUU::JsonData::Runtime::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Read);
+		const auto SourcePath = OUU::JsonData::Runtime::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Read);
 		if (PlatformFile.FileExists(*SourcePath) == false)
 		{
 			PlatformFile.DeleteFile(FilePath);
@@ -852,8 +852,8 @@ void UJsonDataAssetSubsystem::CleanupAssetCache(const FName& RootName)
 		}
 		else
 		{
-			auto AssetModTime = PlatformFile.GetTimeStamp(FilePath);
-			auto SourceModTime = PlatformFile.GetTimeStamp(*SourcePath);
+			const auto AssetModTime = PlatformFile.GetTimeStamp(FilePath);
+			const auto SourceModTime = PlatformFile.GetTimeStamp(*SourcePath);
 
 			if (AssetModTime < SourceModTime)
 			{
@@ -874,7 +874,7 @@ void UJsonDataAssetSubsystem::CleanupAssetCache(const FName& RootName)
 
 void UJsonDataAssetSubsystem::HandlePackageDeleted(UPackage* Package)
 {
-	auto PackagePath = Package->GetPathName();
+	const auto PackagePath = Package->GetPathName();
 
 	if (!OUU::JsonData::Runtime::PackageIsJsonData(PackagePath))
 		return;
@@ -926,9 +926,7 @@ void UJsonDataAssetSubsystem::ModifyCook(const FName& RootName, TSet<FName>& Out
 
 	int32 NumJsonDataAssetsAdded = 0;
 
-	auto VisitorLambda = [&PlatformFile,
-						  &AssetRegistry,
-						  &NumJsonDataAssetsAdded,
+	auto VisitorLambda = [&NumJsonDataAssetsAdded,
 						  &OutDependencyPackages](const TCHAR* FilePath, bool bIsDirectory) -> bool {
 		if (bIsDirectory)
 			return true;
@@ -939,17 +937,18 @@ void UJsonDataAssetSubsystem::ModifyCook(const FName& RootName, TSet<FName>& Out
 		if (OUU::JsonData::Runtime::ShouldIgnoreInvalidExtensions() && FPaths::GetBaseFilename(FilePath).Contains("."))
 			return true;
 
-		auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
-		auto Path = FJsonDataAssetPath::FromPackagePath(PackagePath);
+		const auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
+		const auto Path = FJsonDataAssetPath::FromPackagePath(PackagePath);
 
-		auto* LoadedJsonDataAsset = Path.LoadSynchronous();
+		const auto* LoadedJsonDataAsset = Path.LoadSynchronous();
 		if (!ensure(LoadedJsonDataAsset))
 			return true;
 
+		// ReSharper disable once CppExpressionWithoutSideEffects
 		LoadedJsonDataAsset->ExportJsonFile();
 
-		auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(PackagePath);
-		FAssetIdentifier AssetIdentifier(*PackagePath, *ObjectName);
+		const auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(PackagePath);
+		const FAssetIdentifier AssetIdentifier(*PackagePath, *ObjectName);
 
 		TArray<FAssetIdentifier> Dependencies;
 		IAssetRegistry::Get()->GetDependencies(AssetIdentifier, OUT Dependencies);
@@ -972,7 +971,7 @@ void UJsonDataAssetSubsystem::ModifyCook(const FName& RootName, TSet<FName>& Out
 		return true;
 	};
 
-	IPlatformFile::FDirectoryVisitorFunc VisitorFunc = VisitorLambda;
+	const IPlatformFile::FDirectoryVisitorFunc VisitorFunc = VisitorLambda;
 	PlatformFile.IterateDirectoryRecursively(*JsonDir_READ, VisitorFunc);
 
 	UE_LOG(

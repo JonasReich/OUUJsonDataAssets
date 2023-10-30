@@ -21,7 +21,7 @@
 
 void FJsonFileSourceControlContextMenu::MakeContextMenu(
 	UToolMenu* InMenu,
-	TArray<TSharedRef<const FContentBrowserFileItemDataPayload>>& InSelectedAssets)
+	const TArray<TSharedRef<const FContentBrowserFileItemDataPayload>>& InSelectedAssets)
 {
 	SelectedAssets = InSelectedAssets;
 
@@ -204,7 +204,7 @@ void FJsonFileSourceControlContextMenu::CacheCanExecuteVars()
 	bCanExecuteSCCRevert = false;
 	bCanExecuteSCCSync = false;
 
-	for (auto Asset : SelectedAssets)
+	for (const auto Asset : SelectedAssets)
 	{
 		ISourceControlProvider& SourceControlProvider = ISourceControlModule::Get().GetProvider();
 		if (ISourceControlModule::Get().IsEnabled())
@@ -284,7 +284,7 @@ void FJsonFileSourceControlContextMenu::ExecuteDiffSelected() const
 	}
 }
 
-void FJsonFileSourceControlContextMenu::ExecuteSCCRefresh()
+void FJsonFileSourceControlContextMenu::ExecuteSCCRefresh() const
 {
 	TArray<FString> FileNames;
 	GetSelectedFileNames(OUT FileNames);
@@ -295,7 +295,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCRefresh()
 		EConcurrency::Asynchronous);
 }
 
-void FJsonFileSourceControlContextMenu::ExecuteSCCCheckOut()
+void FJsonFileSourceControlContextMenu::ExecuteSCCCheckOut() const
 {
 	TArray<FString> FileNames;
 	GetSelectedFileNames(OUT FileNames);
@@ -306,7 +306,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCCheckOut()
 	}
 }
 
-void FJsonFileSourceControlContextMenu::ExecuteSCCOpenForAdd()
+void FJsonFileSourceControlContextMenu::ExecuteSCCOpenForAdd() const
 {
 	TArray<FString> FileNames;
 	GetSelectedFileNames(OUT FileNames);
@@ -317,7 +317,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCOpenForAdd()
 	}
 }
 
-void FJsonFileSourceControlContextMenu::ExecuteSCCCheckIn()
+void FJsonFileSourceControlContextMenu::ExecuteSCCCheckIn() const
 {
 	TArray<FString> FileNames;
 	GetSelectedFileNames(OUT FileNames);
@@ -327,7 +327,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCCheckIn()
 	{
 		auto JsonPath = FJsonDataAssetPath::FromPackagePath(
 			OUU::JsonData::Runtime::SourceFullToPackage(FileName, EJsonDataAccessMode::Read));
-		if (auto AssetObject = JsonPath.ResolveObject())
+		if (const auto AssetObject = JsonPath.ResolveObject())
 		{
 			Assets.Add(AssetObject->GetOutermost());
 		}
@@ -344,7 +344,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCCheckIn()
 		 || UserResponse == FEditorFileUtils::EPromptReturnCode::PR_Declined);
 	if (bShouldProceed)
 	{
-		const bool bUseSourceControlStateCache = true;
+		constexpr bool bUseSourceControlStateCache = true;
 
 		FCheckinResultInfo ResultInfo;
 		FSourceControlWindows::PromptForCheckin(
@@ -374,7 +374,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCCheckIn()
 	}
 }
 
-void FJsonFileSourceControlContextMenu::ExecuteSCCHistory()
+void FJsonFileSourceControlContextMenu::ExecuteSCCHistory() const
 {
 	TArray<FString> FileNames;
 	GetSelectedFileNames(OUT FileNames);
@@ -385,24 +385,25 @@ void DiffAgainstDepot(const FString& Filename)
 {
 	// Make sure our history is up to date
 	ISourceControlProvider& SourceControlProvider = ISourceControlModule::Get().GetProvider();
-	TSharedRef<FUpdateStatus, ESPMode::ThreadSafe> UpdateStatusOperation =
+	const TSharedRef<FUpdateStatus, ESPMode::ThreadSafe> UpdateStatusOperation =
 		ISourceControlOperation::Create<FUpdateStatus>();
 	UpdateStatusOperation->SetUpdateHistory(true);
 	SourceControlProvider.Execute(UpdateStatusOperation, Filename);
 
 	// Get the SCC state
-	FSourceControlStatePtr SourceControlState = SourceControlProvider.GetState(Filename, EStateCacheUsage::Use);
+	const FSourceControlStatePtr SourceControlState = SourceControlProvider.GetState(Filename, EStateCacheUsage::Use);
 
 	if (SourceControlState.IsValid() && SourceControlState->IsSourceControlled()
 		&& SourceControlState->GetHistorySize() > 0)
 	{
-		TSharedPtr<ISourceControlRevision, ESPMode::ThreadSafe> Revision = SourceControlState->GetHistoryItem(0);
+		const TSharedPtr<ISourceControlRevision, ESPMode::ThreadSafe> Revision = SourceControlState->GetHistoryItem(0);
 		check(Revision.IsValid());
 
 		FString TempOldTextFilename;
 		if (Revision->Get(TempOldTextFilename))
 		{
-			FString DiffCommand = GetDefault<UEditorLoadingSavingSettings>()->TextDiffToolPath.FilePath;
+			const FString DiffCommand = GetDefault<UEditorLoadingSavingSettings>()->TextDiffToolPath.FilePath;
+			// ReSharper disable once CppExpressionWithoutSideEffects
 			IAssetTools::Get().CreateDiffProcess(DiffCommand, TempOldTextFilename, Filename);
 		}
 	}
@@ -410,13 +411,13 @@ void DiffAgainstDepot(const FString& Filename)
 
 void FJsonFileSourceControlContextMenu::ExecuteSCCDiffAgainstDepot() const
 {
-	for (auto Asset : SelectedAssets)
+	for (const auto Asset : SelectedAssets)
 	{
 		DiffAgainstDepot(Asset->GetFilename());
 	}
 }
 
-void FJsonFileSourceControlContextMenu::ExecuteSCCRevert()
+void FJsonFileSourceControlContextMenu::ExecuteSCCRevert() const
 {
 	TArray<FString> FileNames;
 	GetSelectedFileNames(OUT FileNames);
@@ -432,7 +433,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCRevert()
 		TArray<FString> FilesToRevert;
 		for (auto FileName : FileNames)
 		{
-			if (auto State = SourceControlProvider.GetState(FileName, EStateCacheUsage::ForceUpdate))
+			if (const auto State = SourceControlProvider.GetState(FileName, EStateCacheUsage::ForceUpdate))
 			{
 				auto& ListToAddFile = State->IsAdded() ? FilesToDelete : FilesToRevert;
 				ListToAddFile.Add(FileName);
@@ -441,7 +442,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCRevert()
 
 		if (FilesToRevert.Num() > 0)
 		{
-			TSharedRef<FRevert, ESPMode::ThreadSafe> RevertOperation = ISourceControlOperation::Create<FRevert>();
+			const TSharedRef<FRevert, ESPMode::ThreadSafe> RevertOperation = ISourceControlOperation::Create<FRevert>();
 			SourceControlProvider.Execute(RevertOperation, FilesToRevert);
 
 			for (auto& File : FilesToRevert)
@@ -479,7 +480,7 @@ void FJsonFileSourceControlContextMenu::ExecuteSCCRevert()
 	}
 }
 
-void FJsonFileSourceControlContextMenu::ExecuteSCCSync()
+void FJsonFileSourceControlContextMenu::ExecuteSCCSync() const
 {
 	TArray<FString> FileNames;
 	GetSelectedFileNames(OUT FileNames);

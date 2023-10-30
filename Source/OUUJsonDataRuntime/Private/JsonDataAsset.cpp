@@ -79,10 +79,10 @@ bool UJsonDataAsset::ImportJson(TSharedPtr<FJsonObject> JsonObject, bool bCheckC
 		// There is a chance in the editor that a blueprint class may get recompiled while a json object is being
 		// loaded. In that case	the IsChildOf check will fail and we need to manually check if our current class is the
 		// old version of the correct class.
-		const bool bIsReinstantiatedBlueprint = GetClass()->HasAnyClassFlags(CLASS_NewerVersionExists) && JsonClass
+		const bool bIsReInstantiatedBlueprint = GetClass()->HasAnyClassFlags(CLASS_NewerVersionExists) && JsonClass
 			&& GetClass()->GetName().Contains(JsonClass->GetName());
 
-		if (GetClass()->IsChildOf(JsonClass) == false && bIsReinstantiatedBlueprint == false)
+		if (GetClass()->IsChildOf(JsonClass) == false && bIsReInstantiatedBlueprint == false)
 		{
 			UE_JSON_DATA_MESSAGELOG(
 				Error,
@@ -188,14 +188,14 @@ TSharedRef<FJsonObject> UJsonDataAsset::ExportJson() const
 		FOUUJsonLibraryObjectFilter Filter;
 		Filter.SubObjectDepthLimit = 0;
 
-		// No requirements. We had Edit here before which prevented hidden properties that aren't eitable in UI
-		const int64 CheckFlags = 0;
-		const int64 SkipFlags = CPF_Transient;
+		// No requirements. We had Edit here before which prevented hidden properties that aren't editable in UI
+		constexpr int64 CheckFlags = 0;
+		constexpr int64 SkipFlags = CPF_Transient;
 
 		// Data going into the cooked content directory should write all properties into the files to have a baseline
 		// for modders. Data going into the regular editor saves should perform delta serialization to support
 		// propagation of values from base class defaults.
-		bool bOnlyModifiedProperties = OUU::JsonData::Runtime::ShouldWriteToCookedContent() == false;
+		const bool bOnlyModifiedProperties = OUU::JsonData::Runtime::ShouldWriteToCookedContent() == false;
 
 		Result->SetObjectField(
 			TEXT("Data"),
@@ -227,7 +227,7 @@ bool UJsonDataAsset::ImportJsonFile()
 		return false;
 	}
 
-	auto ThisIfSuccess = LoadJsonDataAsset_Internal(GetPath(), this);
+	const auto ThisIfSuccess = LoadJsonDataAsset_Internal(GetPath(), this);
 	if (IsValid(ThisIfSuccess))
 	{
 		ensureMsgf(
@@ -264,9 +264,9 @@ bool UJsonDataAsset::ExportJsonFile() const
 
 	const FString SavePath = GetJsonFilePathAbs(EJsonDataAccessMode::Write);
 
-	TSharedRef<FJsonObject> JsonObject = ExportJson();
+	const TSharedRef<FJsonObject> JsonObject = ExportJson();
 	FString JsonString;
-	TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(OUT & JsonString);
+	const TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(OUT & JsonString);
 	if (!FJsonSerializer::Serialize(JsonObject, JsonWriter))
 	{
 		UE_JSON_DATA_MESSAGELOG(Error, this, TEXT("Failed to serialize json for object properties"));
@@ -307,7 +307,7 @@ bool UJsonDataAsset::PostLoadJsonData(
 	return true;
 }
 
-bool UJsonDataAsset::MustHandleRename(UObject* OldOuter, const FName OldName) const
+bool UJsonDataAsset::MustHandleRename(const UObject* OldOuter, const FName OldName) const
 {
 	if (IsFileBasedJsonAsset() == false)
 	{
@@ -491,7 +491,7 @@ void UJsonDataAsset::PostRename(UObject* OldOuter, const FName OldName)
 		return;
 	}
 
-	auto OldPackagePathName = OldOuter->GetPathName();
+	const auto OldPackagePathName = OldOuter->GetPathName();
 	OUU::JsonData::Runtime::Private::Delete(OldPackagePathName);
 
 	{
@@ -501,16 +501,16 @@ void UJsonDataAsset::PostRename(UObject* OldOuter, const FName OldName)
 			SlowTask.MakeDialog();
 			SlowTask.EnterProgressFrame(1, INVTEXT("Fixing up referencers..."));
 			// Load the asset tools module
-			FAssetToolsModule& AssetToolsModule = FAssetToolsModule::GetModule();
+			const FAssetToolsModule& AssetToolsModule = FAssetToolsModule::GetModule();
 
 			// Ideally, we wouldn't want to leave a choice for this, because we can't allow keeping around redirectors.
 			// If we allow a choice it should be before the rename starts in the first place.
-			bool bCheckoutAndPrompt = false;
+			constexpr bool bCheckoutAndPrompt = false;
 			AssetToolsModule.Get()
 				.FixupReferencers({Redirector}, bCheckoutAndPrompt, ERedirectFixupMode::DeleteFixedUpRedirectors);
 
-			// Not prompting sometimes leads to json assets referncing other json assets being ignored
-			if (UObjectRedirector* RedirectorStillThere = FindObjectFast<UObjectRedirector>(OldOuter, OldName))
+			// Not prompting sometimes leads to json assets referencing other json assets being ignored
+			if (const UObjectRedirector* RedirectorStillThere = FindObjectFast<UObjectRedirector>(OldOuter, OldName))
 			{
 				if (IsValid(RedirectorStillThere))
 				{
@@ -541,9 +541,10 @@ void UJsonDataAsset::PostSaveRoot(FObjectPostSaveRootContext ObjectSaveContext)
 	if (IsFileBasedJsonAsset() && UJsonDataAssetSubsystem::AutoExportJsonEnabled())
 	{
 		// Only export the json files if the subsystem is fully initialized.
-		// Otherwise we resave the newly loaded uassets created from json back to json.
+		// Otherwise we re-save the newly loaded uassets created from json back to json.
 		// Also, during editor startup the source control provider is not fully initialized and we run into other
 		// issues.
+		// ReSharper disable once CppExpressionWithoutSideEffects
 		ExportJsonFile();
 	}
 #endif
@@ -568,6 +569,7 @@ void UJsonDataAsset::PostDuplicate(bool bDuplicateForPIE)
 
 	if (IsFileBasedJsonAsset())
 	{
+		// ReSharper disable once CppExpressionWithoutSideEffects
 		ExportJsonFile();
 	}
 }
@@ -585,7 +587,7 @@ bool UJsonDataAsset::IsSupportedForNetworking() const
 #if WITH_EDITOR
 EDataValidationResult UJsonDataAsset::IsDataValid(class FDataValidationContext& Context)
 {
-	auto Result = Super::IsDataValid(Context);
+	const auto Result = Super::IsDataValid(Context);
 	if (!IsInJsonDataContentRoot())
 	{
 		Context.AddError(FText::FromString(FString::Printf(

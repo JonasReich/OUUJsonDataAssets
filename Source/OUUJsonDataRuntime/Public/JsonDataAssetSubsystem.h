@@ -23,8 +23,8 @@ public:
 	}
 
 	// - USubsystem
-	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
-	virtual void Deinitialize() override;
+	void Initialize(FSubsystemCollectionBase& Collection) override;
+	void Deinitialize() override;
 	// --
 
 	// If true, asset saves/moves will export to json

@@ -128,7 +128,7 @@ public:
 		Path = Other.Path;
 		return *this;
 	}
-	FORCEINLINE FSoftJsonDataAssetPtr& operator=(FSoftJsonDataAssetPtr&& Other)
+	FORCEINLINE FSoftJsonDataAssetPtr& operator=(FSoftJsonDataAssetPtr&& Other) noexcept
 	{
 		Path = MoveTemp(Other.Path);
 		return *this;
@@ -286,7 +286,7 @@ public:
 		HardReference = Other.HardReference;
 		return *this;
 	}
-	FORCEINLINE FJsonDataAssetPtr& operator=(FJsonDataAssetPtr&& Other)
+	FORCEINLINE FJsonDataAssetPtr& operator=(FJsonDataAssetPtr&& Other) noexcept
 	{
 		Path = MoveTemp(Other.Path);
 		HardReference = Other.HardReference;

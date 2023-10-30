@@ -15,7 +15,7 @@
 class FOUUJsonDataEditorModule : public IModuleInterface
 {
 public:
-	virtual void StartupModule() override
+	void StartupModule() override
 	{
 		FCoreDelegates::OnAllModuleLoadingPhasesComplete.AddLambda([]() {
 #if UE_VERSION_NEWER_THAN(5, 2, 999)
@@ -25,7 +25,7 @@ public:
 #else
 			// This is the only plugin in 5.1 that can conflict with our code.
 			// Needs to be reviewed for future engine versions!
-			auto AssetReferenceRestrictionsPlugin = IPluginManager::Get().FindPlugin("AssetReferenceRestrictions");
+			const auto AssetReferenceRestrictionsPlugin = IPluginManager::Get().FindPlugin("AssetReferenceRestrictions");
 			if (AssetReferenceRestrictionsPlugin->IsEnabled())
 			{
 				UE_LOG(
@@ -49,7 +49,7 @@ public:
 		IAssetTools::Get().RegisterAssetTypeActions(MakeShared<FAssetTypeActions_JsonDataAsset>());
 	}
 
-	virtual void ShutdownModule() override { ContentBrowserJsonDataSource.Reset(); }
+	void ShutdownModule() override { ContentBrowserJsonDataSource.Reset(); }
 
 private:
 	TUniquePtr<FContentBrowserJsonDataSource> ContentBrowserJsonDataSource;

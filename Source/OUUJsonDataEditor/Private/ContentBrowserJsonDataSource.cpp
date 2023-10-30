@@ -3,7 +3,6 @@
 #include "ContentBrowserJsonDataSource.h"
 
 #include "AssetRegistry/AssetData.h"
-#include "AssetRegistry/AssetDependencyGatherer.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetViewUtils.h"
 #include "ClassViewerFilter.h"
@@ -13,22 +12,18 @@
 #include "ContentBrowserFileDataPayload.h"
 #include "Editor.h"
 #include "Engine.h"
-#include "Engine/AssetManager.h"
 #include "Engine/World.h"
-#include "GameDelegates.h"
 #include "HAL/PlatformFile.h"
 #include "IContentBrowserDataModule.h"
 #include "JsonDataAssetEditor.h"
 #include "JsonDataAssetGlobals.h"
 #include "JsonDataAssetSubsystem.h"
 #include "JsonFileSourceControlContextMenu.h"
-#include "JsonLibrary.h"
 #include "Kismet2/SClassPickerDialog.h"
 #include "LogJsonDataAsset.h"
 #include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
 #include "ToolMenus.h"
-#include "UObject/ObjectSaveContext.h"
 #include "UObject/SavePackage.h"
 
 class FAssetClassParentFilter : public IClassViewerFilter
@@ -40,7 +35,7 @@ public:
 	/** Disallowed class flags. */
 	EClassFlags DisallowedClassFlags;
 
-	virtual bool IsClassAllowed(
+	bool IsClassAllowed(
 		const FClassViewerInitializationOptions& InInitOptions,
 		const UClass* InClass,
 		TSharedRef<FClassViewerFilterFuncs> InFilterFuncs) override
@@ -49,7 +44,7 @@ public:
 			&& InFilterFuncs->IfInChildOfClassesSet(AllowedChildrenOfClasses, InClass) != EFilterReturn::Failed;
 	}
 
-	virtual bool IsUnloadedClassAllowed(
+	bool IsUnloadedClassAllowed(
 		const FClassViewerInitializationOptions& InInitOptions,
 		const TSharedRef<const IUnloadedBlueprintData> InUnloadedClassData,
 		TSharedRef<FClassViewerFilterFuncs> InFilterFuncs) override
@@ -65,7 +60,7 @@ namespace OUU::JsonData::Editor
 	/** Copied from OpenUnrealUtilities > OUURuntime > SimpleClassPickerDialog.h */
 	UClass* OpenSimpleClassPickerDialog(UClass* ParentClass, EClassFlags DisallowedClassFlags, const FText TitleText)
 	{
-		TSharedRef<FAssetClassParentFilter> Filter = MakeShareable(new FAssetClassParentFilter);
+		const TSharedRef<FAssetClassParentFilter> Filter = MakeShareable(new FAssetClassParentFilter);
 		Filter->DisallowedClassFlags = DisallowedClassFlags;
 		Filter->AllowedChildrenOfClasses = {ParentClass};
 
@@ -73,9 +68,6 @@ namespace OUU::JsonData::Editor
 		FClassViewerInitializationOptions Options;
 		Options.Mode = EClassViewerMode::ClassPicker;
 		Options.ClassFilters.Add(Filter);
-
-		// Load the classviewer module to display a class picker
-		FClassViewerModule& ClassViewerModule = FModuleManager::LoadModuleChecked<FClassViewerModule>("ClassViewer");
 
 		UClass* NewChosenClass = nullptr;
 		if (SClassPickerDialog::PickClass(TitleText, Options, OUT NewChosenClass, ParentClass))
@@ -97,7 +89,7 @@ bool UContentBrowserJsonFileDataSource::CanRenameItem(
 	const FString* InNewName,
 	FText* OutErrorMsg)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(InItem.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
@@ -113,7 +105,7 @@ bool UContentBrowserJsonFileDataSource::RenameItem(
 	const FString& InNewName,
 	FContentBrowserItemData& OutNewItem)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(InItem.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
@@ -128,7 +120,7 @@ bool UContentBrowserJsonFileDataSource::CanMoveItem(
 	const FName InDestPath,
 	FText* OutErrorMsg)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(InItem.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
@@ -139,7 +131,7 @@ bool UContentBrowserJsonFileDataSource::CanMoveItem(
 		return false;
 	}
 
-	auto GeneratedDestPath =
+	const auto GeneratedDestPath =
 		OUU::Editor::JsonData::ConvertMountedSourceFilenameToMountedDataAssetFilename(InDestPath.ToString());
 
 	return ContentBrowserItem.CanMove(*GeneratedDestPath, OUT OutErrorMsg);
@@ -147,21 +139,21 @@ bool UContentBrowserJsonFileDataSource::CanMoveItem(
 
 bool UContentBrowserJsonFileDataSource::MoveItem(const FContentBrowserItemData& InItem, const FName InDestPath)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(InItem.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
 		return false;
 	}
 
-	auto GeneratedDestPath =
+	const auto GeneratedDestPath =
 		OUU::Editor::JsonData::ConvertMountedSourceFilenameToMountedDataAssetFilename(InDestPath.ToString());
 
-	bool bMoved = ContentBrowserItem.Move(*GeneratedDestPath);
+	const bool bMoved = ContentBrowserItem.Move(*GeneratedDestPath);
 
 	if (ensure(bMoved) && InItem.IsFile())
 	{
-		auto DestJsonAssetPath =
+		const auto DestJsonAssetPath =
 			OUU::Editor::JsonData::ConvertMountedSourceFilenameToDataAssetPath(InDestPath.ToString());
 		ensure(IsValid(DestJsonAssetPath.ResolveObject()));
 	}
@@ -186,7 +178,7 @@ bool UContentBrowserJsonFileDataSource::BulkMoveItems(
 		auto GeneratedDestPath =
 			OUU::Editor::JsonData::ConvertMountedSourceFilenameToMountedDataAssetFilename(InDestPath.ToString());
 
-		bool bMoved = ContentBrowserItem.Move(*GeneratedDestPath);
+		const bool bMoved = ContentBrowserItem.Move(*GeneratedDestPath);
 		ensure(bMoved);
 		bAllMoved &= bMoved;
 	}
@@ -198,7 +190,7 @@ bool UContentBrowserJsonFileDataSource::CanCopyItem(
 	const FName _DestPath,
 	FText* _OutErrorMsg)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(_Item.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
@@ -209,7 +201,7 @@ bool UContentBrowserJsonFileDataSource::CanCopyItem(
 		return false;
 	}
 
-	auto GeneratedDestPath =
+	const auto GeneratedDestPath =
 		OUU::Editor::JsonData::ConvertMountedSourceFilenameToMountedDataAssetFilename(_DestPath.ToString());
 
 	return ContentBrowserItem.CanCopy(*GeneratedDestPath, OUT _OutErrorMsg);
@@ -217,14 +209,14 @@ bool UContentBrowserJsonFileDataSource::CanCopyItem(
 
 bool UContentBrowserJsonFileDataSource::CopyItem(const FContentBrowserItemData& _Item, const FName _DestPath)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(_Item.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
 		return false;
 	}
 
-	auto GeneratedDestPath =
+	const auto GeneratedDestPath =
 		OUU::Editor::JsonData::ConvertMountedSourceFilenameToMountedDataAssetFilename(_DestPath.ToString());
 
 	return ContentBrowserItem.Copy(*GeneratedDestPath);
@@ -247,7 +239,7 @@ bool UContentBrowserJsonFileDataSource::BulkCopyItems(
 		auto GeneratedDestPath =
 			OUU::Editor::JsonData::ConvertMountedSourceFilenameToMountedDataAssetFilename(_DestPath.ToString());
 
-		bool bCopied = ContentBrowserItem.Copy(*GeneratedDestPath);
+		const bool bCopied = ContentBrowserItem.Copy(*GeneratedDestPath);
 		ensure(bCopied);
 		bAllCopied &= bCopied;
 	}
@@ -256,7 +248,7 @@ bool UContentBrowserJsonFileDataSource::BulkCopyItems(
 
 bool UContentBrowserJsonFileDataSource::CanDuplicateItem(const FContentBrowserItemData& _Item, FText* _OutErrorMsg)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(_Item.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
@@ -274,14 +266,14 @@ bool UContentBrowserJsonFileDataSource::DuplicateItem(
 	const FContentBrowserItemData& _Item,
 	FContentBrowserItemDataTemporaryContext& _OutPendingItem)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(_Item.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
 		return false;
 	}
 
-	auto DuplicationContext = ContentBrowserItem.Duplicate();
+	const auto DuplicationContext = ContentBrowserItem.Duplicate();
 
 	FString DefaultAssetName;
 	FString PackageNameToUse;
@@ -317,7 +309,7 @@ bool UContentBrowserJsonFileDataSource::BulkDuplicateItems(
 
 bool UContentBrowserJsonFileDataSource::CanDeleteItem(const FContentBrowserItemData& InItem, FText* OutErrorMsg)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(InItem.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
@@ -333,7 +325,7 @@ bool UContentBrowserJsonFileDataSource::CanDeleteItem(const FContentBrowserItemD
 
 bool UContentBrowserJsonFileDataSource::DeleteItem(const FContentBrowserItemData& InItem)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(InItem.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
@@ -355,7 +347,7 @@ bool UContentBrowserJsonFileDataSource::BulkDeleteItems(TArrayView<const FConten
 			return false;
 		}
 
-		bool bDeleted = ContentBrowserItem.Delete();
+		const bool bDeleted = ContentBrowserItem.Delete();
 		// Deletion can be cancelled via dialog, so it's okay if it's false
 		// ensure(bDeleted);
 		bAllDeleted &= bDeleted;
@@ -367,7 +359,7 @@ bool UContentBrowserJsonFileDataSource::Legacy_TryGetPackagePath(
 	const FContentBrowserItemData& InItem,
 	FName& OutPackagePath)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(InItem.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
@@ -381,7 +373,7 @@ bool UContentBrowserJsonFileDataSource::Legacy_TryGetAssetData(
 	const FContentBrowserItemData& InItem,
 	FAssetData& OutAssetData)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(InItem.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
@@ -393,7 +385,7 @@ bool UContentBrowserJsonFileDataSource::Legacy_TryGetAssetData(
 
 bool UContentBrowserJsonFileDataSource::AppendItemReference(const FContentBrowserItemData& _Item, FString& _OutStr)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(_Item.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
@@ -407,7 +399,7 @@ bool UContentBrowserJsonFileDataSource::UpdateThumbnail(
 	const FContentBrowserItemData& InItem,
 	FAssetThumbnail& OutThumbnail)
 {
-	auto ContentBrowserItem =
+	const auto ContentBrowserItem =
 		OUU::Editor::JsonData::GetGeneratedAssetContentBrowserItem(InItem.GetInternalPath().ToString());
 	if (ContentBrowserItem.IsValid() == false)
 	{
@@ -446,7 +438,7 @@ FContentBrowserJsonDataSource::FContentBrowserJsonDataSource()
 	// For now allow creation in all directories (default if not assigned)
 	JsonFileActions.CanCreate.BindLambda(
 		[](const FName InDestFolderPath, const FString& InDestFolder, FText* OutErrorMsg) -> bool {
-			auto PluginsRoot =
+			const auto PluginsRoot =
 				OUU::JsonData::Runtime::GetSourceMountPointRoot_Package(OUU::JsonData::Runtime::GameRootName)
 				+ "Plugins";
 
@@ -465,9 +457,9 @@ FContentBrowserJsonDataSource::FContentBrowserJsonDataSource()
 	JsonFileActions.ConfigureCreation.BindLambda(
 		[this](FString& OutFileBasename, FStructOnScope& OutCreationConfig) -> bool {
 			OutCreationConfig.Initialize(FOUUJsonDataCreateParams::StaticStruct());
-			auto& Config = *(FOUUJsonDataCreateParams*)OutCreationConfig.GetStructMemory();
+			auto& Config = *reinterpret_cast<FOUUJsonDataCreateParams*>(OutCreationConfig.GetStructMemory());
 
-			EClassFlags DisallowedClassFlags =
+			constexpr EClassFlags DisallowedClassFlags =
 				CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists | CLASS_HideDropDown;
 
 			Config.Class = OUU::JsonData::Editor::OpenSimpleClassPickerDialog(
@@ -480,7 +472,8 @@ FContentBrowserJsonDataSource::FContentBrowserJsonDataSource()
 
 	JsonFileActions.Create.BindLambda(
 		[this](const FName InFilePath, const FString& InFilenameWrong, const FStructOnScope& CreationConfig) -> bool {
-			auto& Config = *(FOUUJsonDataCreateParams*)CreationConfig.GetStructMemory();
+			const auto& Config =
+				*reinterpret_cast<const FOUUJsonDataCreateParams*>(CreationConfig.GetStructMemory());
 			UClass* Class = Config.Class.Get();
 			if (IsValid(Class) == false)
 			{
@@ -493,12 +486,12 @@ FContentBrowserJsonDataSource::FContentBrowserJsonDataSource()
 			}
 
 			// InFilenameWrong is wrong for plugin mounted files. It's correct after converting back and forth though.
-			auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(InFilenameWrong, EJsonDataAccessMode::Read);
+			const auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(InFilenameWrong, EJsonDataAccessMode::Read);
 			return CreateNewJsonAssetWithClass(PackagePath, Class);
 		});
 
 	JsonFileActions.Edit.BindLambda([this](const FName InFilePath, const FString& InFilename) -> bool {
-		auto JsonPath = OUU::Editor::JsonData::ConvertMountedSourceFilenameToDataAssetPath(InFilePath.ToString());
+		const auto JsonPath = OUU::Editor::JsonData::ConvertMountedSourceFilenameToDataAssetPath(InFilePath.ToString());
 		OUU::Editor::JsonData::ContentBrowser_OpenUnrealEditor(JsonPath);
 		return true;
 	});
@@ -566,7 +559,7 @@ FContentBrowserJsonDataSource::~FContentBrowserJsonDataSource()
 {
 	if (JsonFileDataSource.IsValid())
 	{
-		auto* FileDataSource = JsonFileDataSource.Get();
+		const auto* FileDataSource = JsonFileDataSource.Get();
 		if (IsValid(FileDataSource))
 		{
 			// #TODO Fix access violation here.
@@ -576,7 +569,7 @@ FContentBrowserJsonDataSource::~FContentBrowserJsonDataSource()
 	}
 }
 
-void FContentBrowserJsonDataSource::PopulateJsonFileContextMenu(UToolMenu* ContextMenu)
+void FContentBrowserJsonDataSource::PopulateJsonFileContextMenu(UToolMenu* ContextMenu) const
 {
 	const UContentBrowserDataMenuContext_FileMenu* ContextObject =
 		ContextMenu->FindContext<UContentBrowserDataMenuContext_FileMenu>();
@@ -661,7 +654,7 @@ void FContentBrowserJsonDataSource::PopulateJsonFileContextMenu(UToolMenu* Conte
 }
 
 TArray<TSharedRef<const FContentBrowserFileItemDataPayload>> FContentBrowserJsonDataSource::GetSelectedFiles(
-	const UContentBrowserDataMenuContext_FileMenu* ContextObject)
+	const UContentBrowserDataMenuContext_FileMenu* ContextObject) const
 {
 	// Extract the internal file paths that belong to this data source from the full list of selected paths given in the
 	// context
@@ -682,14 +675,14 @@ TArray<TSharedRef<const FContentBrowserFileItemDataPayload>> FContentBrowserJson
 }
 
 TArray<FAssetIdentifier> FContentBrowserJsonDataSource::GetContentBrowserSelectedJsonAssets(
-	FOnContentBrowserGetSelection GetSelectionDelegate)
+	const FOnContentBrowserGetSelection& GetSelectionDelegate)
 {
 	TArray<FAssetIdentifier> OutAssetPackages;
-	TArray<FAssetData> SelectedAssets;
-	TArray<FString> SelectedPaths;
 
 	if (GetSelectionDelegate.IsBound())
 	{
+		TArray<FString> SelectedPaths;
+		TArray<FAssetData> SelectedAssets;
 		TArray<FString> SelectedVirtualPaths;
 		GetSelectionDelegate.Execute(SelectedAssets, SelectedVirtualPaths);
 
@@ -717,7 +710,7 @@ bool FContentBrowserJsonDataSource::ItemPassesFilter(
 	if (OUU::JsonData::Runtime::ShouldIgnoreInvalidExtensions())
 	{
 		// len(".json") -> 5
-		FStringView FilenameWithoutSuffix(*InFilename, FMath::Min(InFilename.Len() - 5, 0));
+		const FStringView FilenameWithoutSuffix(*InFilename, FMath::Min(InFilename.Len() - 5, 0));
 		if (FilenameWithoutSuffix.Contains(TEXT(".")))
 			return false;
 	}
@@ -749,7 +742,7 @@ bool FContentBrowserJsonDataSource::GetItemAttribute(
 	if (InAttributeKey == ContentBrowserItemAttributes::ItemIsLocalizedContent)
 	{
 		// Json data assets can't be localized
-		const bool bIsLocalizedFolder = false; // FPackageName::IsLocalizedPackage(InFilePath.ToString());
+		constexpr bool bIsLocalizedFolder = false; // FPackageName::IsLocalizedPackage(InFilePath.ToString());
 		OutAttributeValue.SetValue(bIsLocalizedFolder);
 		return true;
 	}
@@ -757,14 +750,14 @@ bool FContentBrowserJsonDataSource::GetItemAttribute(
 	if (InAttributeKey == ContentBrowserItemAttributes::ItemIsEngineContent)
 	{
 		// Json data assets can't never be used on engine level.
-		const bool bIsEngineFolder = false;
+		constexpr bool bIsEngineFolder = false;
 		OutAttributeValue.SetValue(bIsEngineFolder);
 		return true;
 	}
 
 	if (InAttributeKey == ContentBrowserItemAttributes::ItemIsProjectContent)
 	{
-		auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForSourcePath(InFilePath.ToString());
+		const auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForSourcePath(InFilePath.ToString());
 		const bool bIsProjectFolder = RootName == OUU::JsonData::Runtime::GameRootName;
 		OutAttributeValue.SetValue(bIsProjectFolder);
 		return true;
@@ -772,7 +765,7 @@ bool FContentBrowserJsonDataSource::GetItemAttribute(
 
 	if (InAttributeKey == ContentBrowserItemAttributes::ItemIsPluginContent)
 	{
-		auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForSourcePath(InFilePath.ToString());
+		const auto RootName = UJsonDataAssetSubsystem::Get().GetRootNameForSourcePath(InFilePath.ToString());
 		// All files in other roots are guaranteed from plugins.
 		const bool bIsPluginFolder = RootName != OUU::JsonData::Runtime::GameRootName;
 		OutAttributeValue.SetValue(bIsPluginFolder);
@@ -782,13 +775,13 @@ bool FContentBrowserJsonDataSource::GetItemAttribute(
 	return false;
 };
 
-bool FContentBrowserJsonDataSource::CreateNewJsonAssetWithClass(const FString& PackagePath, UClass* AssetClass)
+bool FContentBrowserJsonDataSource::CreateNewJsonAssetWithClass(const FString& PackagePath, const UClass* AssetClass)
 {
-	auto FileNameCorrected = OUU::JsonData::Runtime::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Read);
+	const auto FileNameCorrected = OUU::JsonData::Runtime::PackageToSourceFull(PackagePath, EJsonDataAccessMode::Read);
 
-	auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(PackagePath);
+	const auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(PackagePath);
 	UPackage* NewPackage = CreatePackage(*PackagePath);
-	auto NewDataAsset = NewObject<UJsonDataAsset>(NewPackage, AssetClass, *ObjectName, RF_Public | RF_Standalone);
+	const auto NewDataAsset = NewObject<UJsonDataAsset>(NewPackage, AssetClass, *ObjectName, RF_Public | RF_Standalone);
 
 	if (IsValid(NewDataAsset) == false || IsValid(NewPackage) == false)
 	{
@@ -815,7 +808,7 @@ bool FContentBrowserJsonDataSource::CreateNewJsonAssetWithClass(const FString& P
 	FSavePackageArgs SaveArgs;
 	SaveArgs.TopLevelFlags = RF_Standalone;
 	SaveArgs.Error = GWarn;
-	auto SaveResult = UPackage::Save(NewPackage, NewDataAsset, *PackageFilename, SaveArgs);
+	const auto SaveResult = UPackage::Save(NewPackage, NewDataAsset, *PackageFilename, SaveArgs);
 	if (SaveResult.IsSuccessful() == false)
 	{
 		UE_LOG(LogJsonDataAsset, Error, TEXT("Failed to save new package for json data asset %s"), *PackagePath);

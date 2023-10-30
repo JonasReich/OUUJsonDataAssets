@@ -35,8 +35,8 @@ public:
 	static TSharedPtr<FJsonObject> UStructToJsonObject(
 		const void* Data,
 		const void* DefaultData,
-		UStruct* Struct,
-		FOUUJsonLibraryObjectFilter SubObjectFilter,
+		const UStruct* Struct,
+		const FOUUJsonLibraryObjectFilter& SubObjectFilter,
 		int64 CheckFlags = 0,
 		int64 SkipFlags = 0,
 		bool bOnlyModifiedProperties = false);
@@ -59,13 +59,13 @@ public:
 		const void* PropertyData,
 		const void* DefaultPropertyData,
 		FProperty* Property,
-		FOUUJsonLibraryObjectFilter SubObjectFilter,
+		const FOUUJsonLibraryObjectFilter& SubObjectFilter,
 		int64 CheckFlags = 0,
 		int64 SkipFlags = 0,
 		bool bOnlyModifiedProperties = false);
 
 	static bool JsonValueToUProperty(
-		TSharedRef<FJsonValue> JsonValue,
+		const TSharedRef<FJsonValue>& JsonValue,
 		void* PropertyData,
 		FProperty* Property,
 		const FArchive& VersionLoadingArchive,

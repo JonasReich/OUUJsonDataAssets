@@ -9,7 +9,7 @@
 class FOUUJsonDataRuntimeModule : public IModuleInterface
 {
 	// - IModuleInterface
-	virtual void StartupModule() override
+	void StartupModule() override
 	{
 		FCoreDelegates::OnPostEngineInit.AddLambda(
 			[]() { UJsonDataAssetSubsystem::Get().AddPluginDataRoot(TEXT("OUUJsonDataAssets")); });
