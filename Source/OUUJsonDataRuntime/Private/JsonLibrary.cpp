@@ -47,7 +47,10 @@ struct FOUUPropertyJsonResult
 	TSharedPtr<FJsonValue> Value;
 
 	static FOUUPropertyJsonResult Skip() { return FOUUPropertyJsonResult(true, {}); }
-	static FOUUPropertyJsonResult Json(const TSharedPtr<FJsonValue>& Value) { return FOUUPropertyJsonResult(false, Value); }
+	static FOUUPropertyJsonResult Json(const TSharedPtr<FJsonValue>& Value)
+	{
+		return FOUUPropertyJsonResult(false, Value);
+	}
 
 private:
 	FOUUPropertyJsonResult(bool bSkip, const TSharedPtr<FJsonValue>& Value) : bSkip(bSkip), Value(Value) {}
@@ -148,7 +151,7 @@ struct FJsonLibraryExportHelper
 		{
 			// see if it's an enum
 			UEnum* EnumDef = NumericProperty->GetIntPropertyEnum();
-			if (EnumDef != NULL)
+			if (EnumDef != nullptr)
 			{
 				// export enums as strings
 				FString StringValue =
@@ -172,7 +175,7 @@ struct FJsonLibraryExportHelper
 		}
 		else if (FBoolProperty* BoolProperty = CastField<FBoolProperty>(Property))
 		{
-			// Export bools as bools
+			// Export booleans as booleans
 			return FOUUPropertyJsonResult::Json(MakeShared<FJsonValueBoolean>(BoolProperty->GetPropertyValue(Value)));
 		}
 		else if (FStrProperty* StringProperty = CastField<FStrProperty>(Property))
@@ -403,7 +406,7 @@ struct FJsonLibraryExportHelper
 		{
 			// Default to export as string for everything else
 			FString StringValue;
-			Property->ExportTextItem_Direct(StringValue, Value, NULL, NULL, PPF_None);
+			Property->ExportTextItem_Direct(StringValue, Value, nullptr, nullptr, PPF_None);
 			return FOUUPropertyJsonResult::Json(MakeShared<FJsonValueString>(StringValue));
 		}
 
@@ -511,7 +514,8 @@ struct FJsonLibraryExportHelper
 			const void* DefaultValue = DefaultStruct ? Property->ContainerPtrToValuePtr<uint8>(DefaultStruct) : nullptr;
 
 			// convert the property to a FJsonValue
-			const auto PropertyResult = UPropertyToJsonValue(Property, Value, DefaultValue, CheckFlags, SkipFlags, ExportCb);
+			const auto PropertyResult =
+				UPropertyToJsonValue(Property, Value, DefaultValue, CheckFlags, SkipFlags, ExportCb);
 			if (PropertyResult.bSkip)
 				continue;
 
@@ -604,8 +608,9 @@ struct FJsonLibraryExportHelper
 	}
 
 	TSharedPtr<FJsonValue> ConvertPropertyToJsonValue(const void* Data, const void* DefaultData, FProperty* Property)
+		const
 	{
-		FJsonObjectConverter::CustomExportCallback CustomCB = GetCustomCallback();
+		const FJsonObjectConverter::CustomExportCallback CustomCB = GetCustomCallback();
 		auto Result = UPropertyToJsonValue(Property, Data, DefaultData, DefaultCheckFlags, DefaultSkipFlags, &CustomCB);
 		if (Result.Value)
 		{
@@ -624,7 +629,7 @@ struct FJsonLibraryExportHelper
 		constexpr int32 Indent = 4;
 		TSharedRef<TJsonWriter<TCHAR, PrintPolicy>> JsonWriter =
 			TJsonWriterFactory<TCHAR, PrintPolicy>::Create(&OutJsonString, Indent);
-		bool bSuccess = FJsonSerializer::Serialize(JsonObject, JsonWriter);
+		const bool bSuccess = FJsonSerializer::Serialize(JsonObject, JsonWriter);
 		JsonWriter->Close();
 		return bSuccess;
 	}
@@ -771,7 +776,8 @@ struct FJsonLibraryImportHelper
 			else
 			{
 				// AsNumber will log an error for completely inappropriate types (then give us a default)
-				EnumProperty->GetUnderlyingProperty()->SetIntPropertyValue(OutValue, StaticCast<int64>(JsonValue->AsNumber()));
+				EnumProperty->GetUnderlyingProperty()
+					->SetIntPropertyValue(OutValue, StaticCast<int64>(JsonValue->AsNumber()));
 			}
 		}
 		else if (FNumericProperty* NumericProperty = CastField<FNumericProperty>(Property))
@@ -1093,7 +1099,7 @@ struct FJsonLibraryImportHelper
 				TSharedPtr<FJsonObject> Obj = JsonValue->AsObject();
 				check(Obj.IsValid()); // should not fail if Type == EJson::Object
 
-				// import the subvalue as a culture invariant string
+				// import the sub-value as a culture invariant string
 				FText Text;
 				if (!FJsonObjectConverter::GetTextFromObject(Obj.ToSharedRef(), Text))
 				{
@@ -1317,6 +1323,7 @@ struct FJsonLibraryImportHelper
 				Obj->RemoveField(ObjectClassNameKey);
 				if (!ClassString.IsEmpty())
 				{
+					// ReSharper disable once CppTooWideScope
 					UClass* FoundClass = FPackageName::IsShortPackageName(ClassString)
 						? FindFirstObject<UClass>(*ClassString)
 						: UClass::TryFindTypeSlow<UClass>(ClassString);
@@ -1348,13 +1355,12 @@ struct FJsonLibraryImportHelper
 						UE_LOG(
 							LogJsonDataAsset,
 							Warning,
-							TEXT("JsonValueToUProperty - JSON object class %s saved in property %s on object %s does "
-								 "not exist. "
-								 "Will try to load as default class instead."),
+							TEXT("JsonValueToUProperty - JSON object class %s saved in property %s of type %s on "
+								 "object %s does not exist. Will try to load as default class instead."),
 							*ClassString,
 							*Property->GetAuthoredName(),
-							*Outer->GetPathName(),
-							*ObjectProperty->PropertyClass->GetAuthoredName());
+							*ObjectProperty->PropertyClass->GetAuthoredName(),
+							*Outer->GetPathName());
 						// GRIMLORE End
 					}
 				}
@@ -1910,7 +1916,7 @@ TSharedPtr<FJsonObject> UOUUJsonLibrary::UStructToJsonObject(
 		return nullptr;
 	}
 
-	FJsonLibraryExportHelper Helper{CheckFlags, SkipFlags, SubObjectFilter, bOnlyModifiedProperties};
+	const FJsonLibraryExportHelper Helper{CheckFlags, SkipFlags, SubObjectFilter, bOnlyModifiedProperties};
 	return Helper.ConvertStructToJsonObject(Data, DefaultData, Struct);
 }
 
@@ -1927,7 +1933,7 @@ TSharedPtr<FJsonObject> UOUUJsonLibrary::UObjectToJsonObject(
 		return nullptr;
 	}
 
-	FJsonLibraryExportHelper Helper{CheckFlags, SkipFlags, SubObjectFilter, bOnlyModifiedProperties};
+	const FJsonLibraryExportHelper Helper{CheckFlags, SkipFlags, SubObjectFilter, bOnlyModifiedProperties};
 	return Helper.ConvertObjectToJsonObject(Object);
 }
 
@@ -1946,7 +1952,7 @@ TSharedPtr<FJsonValue> UOUUJsonLibrary::UPropertyToJsonValue(
 		return nullptr;
 	}
 
-	FJsonLibraryExportHelper Helper{CheckFlags, SkipFlags, SubObjectFilter, bOnlyModifiedProperties};
+	const FJsonLibraryExportHelper Helper{CheckFlags, SkipFlags, SubObjectFilter, bOnlyModifiedProperties};
 	return Helper.ConvertPropertyToJsonValue(PropertyData, DefaultPropertyData, Property);
 }
 
@@ -2010,7 +2016,7 @@ bool UOUUJsonLibrary::JsonStringToUObject(
 	}
 
 	TSharedPtr<FJsonObject> JsonObject;
-	TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(String);
+	const TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(String);
 	if (!FJsonSerializer::Deserialize(JsonReader, JsonObject) || !JsonObject.IsValid())
 	{
 		UE_LOG(LogJsonDataAsset, Warning, TEXT("JsonStringToUObject - Unable to parse json=[%s]"), *String);

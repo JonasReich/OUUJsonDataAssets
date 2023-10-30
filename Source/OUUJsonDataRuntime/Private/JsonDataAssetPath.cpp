@@ -92,7 +92,7 @@ void FJsonDataAssetPath::SetObjectPath(const FString& InObjectPath)
 void FJsonDataAssetPath::SetFromString(const FString& InString)
 {
 	int32 Index = INDEX_NONE;
-	InString.FindLastChar(TCHAR('.'), OUT Index);
+	InString.FindLastChar('.', OUT Index);
 	if (Index == INDEX_NONE)
 	{
 		SetPackagePath(InString);

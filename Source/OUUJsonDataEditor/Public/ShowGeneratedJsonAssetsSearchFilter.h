@@ -15,7 +15,7 @@ public:
 	GENERATED_BODY()
 
 	// - UContentBrowserFrontEndFilterExtension
-	virtual void AddFrontEndFilterExtensions(
+	void AddFrontEndFilterExtensions(
 		TSharedPtr<class FFrontendFilterCategory> DefaultCategory,
 		TArray<TSharedRef<class FFrontendFilter>>& InOutFilterList) const override;
 	// --

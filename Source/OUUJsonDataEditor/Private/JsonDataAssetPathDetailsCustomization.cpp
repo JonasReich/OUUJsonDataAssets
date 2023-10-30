@@ -4,9 +4,7 @@
 
 #include "AssetRegistry/IAssetRegistry.h"
 #include "ContentBrowserDataDragDropOp.h"
-#include "ContentBrowserModule.h"
 #include "DetailWidgetRow.h"
-#include "Engine/AssetManager.h"
 #include "IContentBrowserSingleton.h"
 #include "Input/DragAndDrop.h"
 #include "JsonAssetReferenceFilter.h"
@@ -24,11 +22,11 @@
 namespace OUU::JsonData::Editor::Private
 {
 	TOptional<FJsonDataAssetPath> GetFirstJsonPathFromDragDropOp(
-		TSharedPtr<FContentBrowserDataDragDropOp> ContentDragDropOp)
+		const TSharedPtr<FContentBrowserDataDragDropOp>& ContentDragDropOp)
 	{
 		auto Files = ContentDragDropOp->GetDraggedFiles();
-		auto Root = OUU::JsonData::Runtime::GetSourceMountPointRoot_Package(OUU::JsonData::Runtime::GameRootName);
-		auto Prefix = FString::Printf(TEXT("/All%s"), *Root);
+		const auto Root = OUU::JsonData::Runtime::GetSourceMountPointRoot_Package(OUU::JsonData::Runtime::GameRootName);
+		const auto Prefix = FString::Printf(TEXT("/All%s"), *Root);
 		for (auto File : Files)
 		{
 			if (auto* FileItem = File.GetPrimaryInternalItem())
@@ -44,32 +42,6 @@ namespace OUU::JsonData::Editor::Private
 			}
 		}
 		return {};
-	}
-
-	// Helper to support both meta=(TagName) and meta=(TagName=true) syntaxes
-	static bool GetTagOrBoolMetadata(const FProperty* Property, const TCHAR* TagName, bool bDefault)
-	{
-		bool bResult = bDefault;
-
-		if (Property->HasMetaData(TagName))
-		{
-			bResult = true;
-
-			const FString ValueString = Property->GetMetaData(TagName);
-			if (!ValueString.IsEmpty())
-			{
-				if (ValueString == TEXT("true"))
-				{
-					bResult = true;
-				}
-				else if (ValueString == TEXT("false"))
-				{
-					bResult = false;
-				}
-			}
-		}
-
-		return bResult;
 	}
 
 	UClass* GetObjectPropertyClass(const FProperty* Property)
@@ -119,7 +91,7 @@ namespace OUU::JsonData::Editor::Private
 		TArray<const UClass*>& OutAllowedClassFilters,
 		TArray<const UClass*>& OutDisallowedClassFilters)
 	{
-		auto* ObjectClass = GetObjectPropertyClass(Property);
+		const auto* ObjectClass = GetObjectPropertyClass(Property);
 
 		// Copied from void SPropertyEditorAsset::InitializeClassFilters(const FProperty* Property)
 		if (Property == nullptr)
@@ -145,14 +117,12 @@ namespace OUU::JsonData::Editor::Private
 
 			for (const FString& ClassName : AllowedClassFilterNames)
 			{
-				UClass* Class = FindClass(ClassName);
-
-				if (Class)
+				if (const UClass* Class = FindClass(ClassName))
 				{
 					// If the class is an interface, expand it to be all classes in memory that implement the class.
 					if (Class->HasAnyClassFlags(CLASS_Interface))
 					{
-						for (UClass* ClassWithInterface : TObjectRange<UClass>())
+						for (const UClass* ClassWithInterface : TObjectRange<UClass>())
 						{
 							if (ClassWithInterface->ImplementsInterface(Class))
 							{
@@ -182,14 +152,12 @@ namespace OUU::JsonData::Editor::Private
 
 			for (const FString& ClassName : DisallowedClassFilterNames)
 			{
-				UClass* Class = FindClass(ClassName);
-
-				if (Class)
+				if (const UClass* Class = FindClass(ClassName))
 				{
 					// If the class is an interface, expand it to be all classes in memory that implement the class.
 					if (Class->HasAnyClassFlags(CLASS_Interface))
 					{
-						for (UClass* ClassWithInterface : TObjectRange<UClass>())
+						for (const UClass* ClassWithInterface : TObjectRange<UClass>())
 						{
 							if (ClassWithInterface->ImplementsInterface(Class))
 							{
@@ -243,16 +211,14 @@ void FJsonDataAssetPathCustomization::CustomizeHeader(
 		PathPropertyHandle = PropertyHandle;
 	}
 
-	auto ChildHandle =
+	const auto ChildHandle =
 		PathPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FJsonDataAssetPath, Path)).ToSharedRef();
-	FObjectPropertyBase* ChildProperty = CastField<FObjectPropertyBase>(ChildHandle->GetProperty());
+	const FObjectPropertyBase* ChildProperty = CastField<FObjectPropertyBase>(ChildHandle->GetProperty());
 
 	bool HasClassFilters = false;
-	const FString* OptClassPath = EditedStruct->FindMetaData(TEXT("JsonDataAssetClass"));
-	if (OptClassPath)
+	if (const FString* OptClassPath = EditedStruct->FindMetaData(TEXT("JsonDataAssetClass")))
 	{
-		auto pFilterClass = TSoftClassPtr<UJsonDataAsset>(FSoftObjectPath(*OptClassPath)).LoadSynchronous();
-		if (pFilterClass)
+		if (const auto pFilterClass = TSoftClassPtr<UJsonDataAsset>(FSoftObjectPath(*OptClassPath)).LoadSynchronous())
 		{
 			AllowedClassFilters.Add(pFilterClass);
 			HasClassFilters = true;
@@ -262,10 +228,11 @@ void FJsonDataAssetPathCustomization::CustomizeHeader(
 	TArray<UObject*> OuterObjects;
 	PropertyHandle->GetOuterObjects(OuterObjects);
 
-	auto FilterDelegate = FOnShouldFilterAsset::CreateSP(this, &FJsonDataAssetPathCustomization::OnShouldFilterAsset);
+	const auto FilterDelegate =
+		FOnShouldFilterAsset::CreateSP(this, &FJsonDataAssetPathCustomization::OnShouldFilterAsset);
 
-	TArray<FAssetData> ContextOwnerAssets{FJsonAssetReferenceFilter::PassFilterKey()};
-	auto EditWidget =
+	const TArray<FAssetData> ContextOwnerAssets{FJsonAssetReferenceFilter::PassFilterKey()};
+	const auto EditWidget =
 		SNew(SObjectPropertyEntryBox)
 			.ThumbnailPool(CustomizationUtils.GetThumbnailPool())
 			.PropertyHandle(ChildHandle)
@@ -283,11 +250,11 @@ void FJsonDataAssetPathCustomization::CustomizeHeader(
 						 [SNew(SButton)
 							  .ButtonStyle(FAppStyle::Get(), "SimpleButton")
 							  .OnClicked_Lambda([PathPropertyHandle]() -> FReply {
-								  void* PathAdress = nullptr;
-								  if (PathPropertyHandle->GetValueData(OUT PathAdress)
+								  void* PathAddress = nullptr;
+								  if (PathPropertyHandle->GetValueData(OUT PathAddress)
 									  == FPropertyAccess::Result::Success)
 								  {
-									  const FJsonDataAssetPath& Path = *static_cast<FJsonDataAssetPath*>(PathAdress);
+									  const FJsonDataAssetPath& Path = *static_cast<FJsonDataAssetPath*>(PathAddress);
 									  OUU::Editor::JsonData::ContentBrowser_NavigateToSources({Path});
 								  }
 								  return FReply::Handled();
@@ -297,28 +264,28 @@ void FJsonDataAssetPathCustomization::CustomizeHeader(
 										 .Image(FSlateIcon("EditorStyle", "Icons.OpenSourceLocation").GetSmallIcon())
 										 .ColorAndOpacity(FSlateColor::UseForeground())]]];
 
-	auto IsRecognized = [](TSharedPtr<FDragDropOperation> DragDropOperation) -> bool {
+	auto IsRecognized = [](const TSharedPtr<FDragDropOperation>& DragDropOperation) -> bool {
 		if (DragDropOperation.IsValid() && DragDropOperation->IsOfType<FContentBrowserDataDragDropOp>())
 		{
-			auto ContentBrowserDragDropOp = StaticCastSharedPtr<FContentBrowserDataDragDropOp>(DragDropOperation);
-			auto OptJsonPath = OUU::JsonData::Editor::Private::GetFirstJsonPathFromDragDropOp(ContentBrowserDragDropOp);
+			const auto ContentBrowserDragDropOp = StaticCastSharedPtr<FContentBrowserDataDragDropOp>(DragDropOperation);
+			const auto OptJsonPath = OUU::JsonData::Editor::Private::GetFirstJsonPathFromDragDropOp(ContentBrowserDragDropOp);
 			return OptJsonPath.IsSet();
 		}
 		return false;
 	};
 
-	auto AllowDrop = [this](TSharedPtr<FDragDropOperation> DragDropOperation) {
+	auto AllowDrop = [this](const TSharedPtr<FDragDropOperation>& DragDropOperation) {
 		if (DragDropOperation.IsValid() && DragDropOperation->IsOfType<FContentBrowserDataDragDropOp>())
 		{
-			auto ContentBrowserDragDropOp = StaticCastSharedPtr<FContentBrowserDataDragDropOp>(DragDropOperation);
+			const auto ContentBrowserDragDropOp = StaticCastSharedPtr<FContentBrowserDataDragDropOp>(DragDropOperation);
 			auto OptJsonPath = OUU::JsonData::Editor::Private::GetFirstJsonPathFromDragDropOp(ContentBrowserDragDropOp);
 
 			if (OptJsonPath.IsSet())
 			{
-				auto JsonPackagePath = OptJsonPath->GetPackagePath();
-				auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(JsonPackagePath);
+				const auto JsonPackagePath = OptJsonPath->GetPackagePath();
+				const auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(JsonPackagePath);
 
-				auto AssetData = IAssetRegistry::Get()->GetAssetByObjectPath(
+				const auto AssetData = IAssetRegistry::Get()->GetAssetByObjectPath(
 					FSoftObjectPath(JsonPackagePath + TEXT(".") + ObjectName));
 
 				// Allow dropping if the filter would not filter the asset out
@@ -329,14 +296,14 @@ void FJsonDataAssetPathCustomization::CustomizeHeader(
 	};
 
 	auto OnDroppedLambda = [PathPropertyHandle](const FGeometry&, const FDragDropEvent& DragDropEvent) -> FReply {
-		if (TSharedPtr<FContentBrowserDataDragDropOp> ContentDragDropOp =
+		if (const TSharedPtr<FContentBrowserDataDragDropOp> ContentDragDropOp =
 				DragDropEvent.GetOperationAs<FContentBrowserDataDragDropOp>())
 		{
 			auto OptJsonPath = OUU::JsonData::Editor::Private::GetFirstJsonPathFromDragDropOp(ContentDragDropOp);
 			if (OptJsonPath.IsSet())
 			{
-				auto JsonPackagePath = OptJsonPath->GetPackagePath();
-				auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(JsonPackagePath);
+				const auto JsonPackagePath = OptJsonPath->GetPackagePath();
+				const auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(JsonPackagePath);
 				PathPropertyHandle->SetValueFromFormattedString(JsonPackagePath + TEXT(".") + ObjectName);
 				return FReply::Handled();
 			}
@@ -344,7 +311,7 @@ void FJsonDataAssetPathCustomization::CustomizeHeader(
 		return FReply::Unhandled();
 	};
 
-	auto CustomJsonDataDropTarget = SNew(SDropTarget)
+	const auto CustomJsonDataDropTarget = SNew(SDropTarget)
 										.OnIsRecognized(SDropTarget::FVerifyDrag::CreateLambda(IsRecognized))
 										.OnAllowDrop(SDropTarget::FVerifyDrag::CreateLambda(AllowDrop))
 										.OnDropped(FOnDrop::CreateLambda(OnDroppedLambda))
@@ -373,7 +340,7 @@ void FJsonDataAssetPathCustomization::CustomizeChildren(
 
 bool FJsonDataAssetPathCustomization::OnShouldFilterAsset(const FAssetData& AssetData) const
 {
-	auto* AssetClass = AssetData.GetClass();
+	const auto* AssetClass = AssetData.GetClass();
 	// Blueprint based classes may not be loaded yet, so we need to load it manually
 	if (AssetClass == nullptr)
 	{

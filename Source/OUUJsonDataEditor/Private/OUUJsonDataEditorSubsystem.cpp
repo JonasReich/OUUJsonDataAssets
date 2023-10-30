@@ -29,9 +29,7 @@ void UOUUJsonDataEditorSubsystem::Initialize(FSubsystemCollectionBase& Collectio
 
 void UOUUJsonDataEditorSubsystem::Deinitialize()
 {
-	auto pPropertyEditor = FModuleManager::GetModulePtr<FPropertyEditorModule>("PropertyEditor");
-
-	if (pPropertyEditor)
+	if (auto pPropertyEditor = FModuleManager::GetModulePtr<FPropertyEditorModule>("PropertyEditor"))
 	{
 		for (TObjectIterator<UStruct> It; It; ++It)
 		{

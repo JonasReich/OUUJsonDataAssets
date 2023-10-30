@@ -15,7 +15,7 @@ class OUUJSONDATAEDITOR_API UOUUJsonDataEditorSubsystem : public UEditorSubsyste
 
 public:
 	// - USubsystem
-	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
-	virtual void Deinitialize() override;
+	void Initialize(FSubsystemCollectionBase& Collection) override;
+	void Deinitialize() override;
 	// --
 };

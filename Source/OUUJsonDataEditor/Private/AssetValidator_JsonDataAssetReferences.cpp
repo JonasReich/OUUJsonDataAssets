@@ -98,8 +98,7 @@ EDataValidationResult UAssetValidator_JsonDataAssetReferences::ValidateLoadedAss
 		}
 		else
 		{
-			const auto SoftObjectPtrField = CastField<FSoftObjectProperty>(Field);
-			if (SoftObjectPtrField)
+			if (const auto SoftObjectPtrField = CastField<FSoftObjectProperty>(Field))
 			{
 				const auto& SoftObjectPtr = SoftObjectPtrField->GetPropertyValue(ValuePtr);
 				bIsReferencingJsonAsset = SoftObjectPtr.GetLongPackageName().Contains(JsonContentRoot);
