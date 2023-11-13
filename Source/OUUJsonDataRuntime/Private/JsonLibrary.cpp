@@ -121,9 +121,10 @@ struct FJsonLibraryExportHelper
 		int64 CheckFlags,
 		int64 SkipFlags,
 		const FJsonObjectConverter::CustomExportCallback* ExportCb,
-		FProperty* OuterProperty) const
+		FProperty* OuterProperty,
+		const bool SkipIfValueMatchesDefault = true) const
 	{
-		if (SkipPropertyMatchingDefaultValues(Property, Value, DefaultValue))
+		if (SkipIfValueMatchesDefault && SkipPropertyMatchingDefaultValues(Property, Value, DefaultValue))
 		{
 			return FOUUPropertyJsonResult::Skip();
 		}
@@ -354,7 +355,7 @@ struct FJsonLibraryExportHelper
 					SkipFlags,
 					ExportCb))
 			{
-				return (MinimumOneValueSet || bOnlyModifiedProperties == false)
+				return (MinimumOneValueSet || bOnlyModifiedProperties == false || SkipIfValueMatchesDefault == false)
 					? FOUUPropertyJsonResult::Json(MakeShared<FJsonValueObject>(Out))
 					: FOUUPropertyJsonResult::Skip();
 			}
@@ -390,7 +391,8 @@ struct FJsonLibraryExportHelper
 
 					TSharedRef<FJsonValueObject> JsonObject = MakeShared<FJsonValueObject>(Out);
 					JsonObject->Type = EJson::Object;
-					return (MinimumOneValueSet || bOnlyModifiedProperties == false || bDifferentClass)
+					return (MinimumOneValueSet || bOnlyModifiedProperties == false || bDifferentClass
+							|| SkipIfValueMatchesDefault == false)
 						? FOUUPropertyJsonResult::Json(JsonObject)
 						: FOUUPropertyJsonResult::Skip();
 				}
@@ -447,12 +449,13 @@ struct FJsonLibraryExportHelper
 			auto ArrayElement = ConvertScalarFPropertyToJsonValue(
 				Property,
 				StaticCast<const char*>(Value) + Index * Property->ElementSize,
-				DefaultValue ? StaticCast<const char*>(DefaultValue) + Index + Property->ElementSize : nullptr,
+				DefaultValue ? StaticCast<const char*>(DefaultValue) + Index * Property->ElementSize : nullptr,
 				Index,
 				CheckFlags,
 				SkipFlags,
 				ExportCb,
-				OuterProperty);
+				OuterProperty,
+				false);
 
 			// We can't really skip individual array elements, can we?
 			// Also, we already assume, something is changed in here, so we have to serialize the entire array
