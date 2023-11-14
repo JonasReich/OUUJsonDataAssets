@@ -6,11 +6,34 @@
 
 #include "Engine.h"
 #include "JsonDataAsset.h"
+#include "JsonDataAssetPath.h"
 #include "Subsystems/EngineSubsystem.h"
 
 #include "JsonDataAssetSubsystem.generated.h"
 
-struct FJsonDataAssetPath;
+USTRUCT()
+struct FJsonDataAssetPaths
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	TArray<FJsonDataAssetPath> Paths;
+};
+
+USTRUCT()
+struct FJsonDataAssetMetaDataCache
+{
+	GENERATED_BODY()
+
+public:
+	bool SaveToFile(const FString& FilePath) const;
+	bool LoadFromFile(const FString& FilePath);
+
+public:
+	UPROPERTY()
+	TMap<FTopLevelAssetPath, FJsonDataAssetPaths> PathsByClass;
+};
 
 UCLASS(BlueprintType)
 class OUUJSONDATARUNTIME_API UJsonDataAssetSubsystem : public UEngineSubsystem
@@ -47,6 +70,12 @@ public:
 	 * Rescan all json data asset files on disk.
 	 */
 	void RescanAllAssets();
+
+	// Get all json data assets of the given class.
+	UFUNCTION(BlueprintCallable)
+	TArray<FJsonDataAssetPath> GetJsonAssetsByClass(
+		TSoftClassPtr<UJsonDataAsset> Class,
+		const bool bSearchSubClasses = false) const;
 
 private:
 	void ImportAllAssets(const FName& RootName, bool bOnlyMissing);
@@ -94,6 +123,8 @@ public:
 	FOnNewPluginRootAdded OnNewPluginRootAdded;
 
 private:
+	FString GetMetaDataCacheFilePath(const EJsonDataAccessMode AccessMode) const;
+
 	void RegisterMountPoints(const FName& RootName);
 	void UnregisterMountPoints(const FName& RootName);
 
@@ -109,7 +140,10 @@ private:
 
 	UFUNCTION()
 	void ModifyCook(TArray<FString>& OutExtraPackagesToCook);
-	void ModifyCook(const FName& RootName, TSet<FName>& OutDependencyPackages);
+	void ModifyCookInternal(
+		const FName& RootName,
+		TSet<FName>& OutDependencyPackages,
+		FJsonDataAssetMetaDataCache& OutMetaDataCache);
 #endif
 
 	bool bIsInitialAssetImportCompleted = false;
@@ -134,4 +168,6 @@ private:
 
 	TArray<FName> AllPluginRootNames;
 	TArray<FName> AllRootNames;
+
+	FJsonDataAssetMetaDataCache AssetMetaDataCache;
 };

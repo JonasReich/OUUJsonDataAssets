@@ -9,6 +9,7 @@
 #include "JsonDataAssetConsoleVariables.h"
 #include "JsonDataAssetGlobals.h"
 #include "JsonDataCacheVersion.h"
+#include "JsonLibrary.h"
 #include "LogJsonDataAsset.h"
 #include "OUUJsonDataRuntimeVersion.h"
 #include "UObject/SavePackage.h"
@@ -191,6 +192,70 @@ namespace OUU::JsonData::Runtime
 
 } // namespace OUU::JsonData::Runtime
 
+bool FJsonDataAssetMetaDataCache::SaveToFile(const FString& FilePath) const
+{
+	const auto MetaDataCacheJsonObject = UOUUJsonLibrary::UStructToJsonObject(this, {}, 0, 0, false);
+	if (MetaDataCacheJsonObject.IsValid() == false)
+	{
+		UE_LOG(LogJsonDataAsset, Error, TEXT("Failed to create Json object from meta data cache."));
+		return false;
+	}
+
+	FString JsonString;
+	const TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(OUT & JsonString);
+	if (FJsonSerializer::Serialize(MetaDataCacheJsonObject.ToSharedRef(), JsonWriter) == false)
+	{
+		UE_LOG(LogJsonDataAsset, Error, TEXT("Failed to serialize Json asset meta data cache."));
+		return false;
+	}
+
+	if (FFileHelper::SaveStringToFile(JsonString, *FilePath) == false)
+	{
+		UE_LOG(LogJsonDataAsset, Error, TEXT("Failed to save Json asset meta data cache to file %s."), *FilePath);
+		return false;
+	}
+
+	return true;
+}
+
+bool FJsonDataAssetMetaDataCache::LoadFromFile(const FString& FilePath)
+{
+	FString JsonString;
+	if (FFileHelper::LoadFileToString(JsonString, *FilePath) == false)
+	{
+		UE_LOG(LogJsonDataAsset, Error, TEXT("Failed to load Json asset meta data cache from file %s."), *FilePath);
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> JsonObject;
+	TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(JsonString);
+	if (FJsonSerializer::Deserialize(JsonReader, JsonObject) == false || JsonObject.IsValid() == false)
+	{
+		UE_LOG(
+			LogJsonDataAsset,
+			Error,
+			TEXT("Failed to deserialize Json asset meta data cache from file %s."),
+			*FilePath);
+		return false;
+	}
+
+	FArchive VersionLoadingArchive;
+	VersionLoadingArchive.SetIsLoading(true);
+	VersionLoadingArchive.SetIsPersistent(true);
+	if (UOUUJsonLibrary::JsonObjectToUStruct(
+			JsonObject.ToSharedRef(),
+			FJsonDataAssetMetaDataCache::StaticStruct(),
+			this,
+			VersionLoadingArchive)
+		== false)
+	{
+		UE_LOG(LogJsonDataAsset, Error, TEXT("Failed to load Json asset meta data cache from Json object."));
+		return false;
+	}
+
+	return true;
+}
+
 void UJsonDataAssetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -230,6 +295,9 @@ void UJsonDataAssetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	// ReSharper disable once CppDeprecatedEntity
 	FGameDelegates::Get().GetCookModificationDelegate().BindUObject(this, &UJsonDataAssetSubsystem::ModifyCook);
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#else
+	// In non-editor builds, load Json asset meta data cache file.
+	AssetMetaDataCache.LoadFromFile(GetMetaDataCacheFilePath(EJsonDataAccessMode::Read));
 #endif
 }
 
@@ -461,6 +529,46 @@ void UJsonDataAssetSubsystem::RescanAllAssets()
 	}
 
 	bJsonDataAssetListBuilt = true;
+}
+
+TArray<FJsonDataAssetPath> UJsonDataAssetSubsystem::GetJsonAssetsByClass(
+	TSoftClassPtr<UJsonDataAsset> Class,
+	const bool bSearchSubClasses) const
+{
+	const auto& AssetRegistry = IAssetRegistry::GetChecked();
+	const FTopLevelAssetPath ClassAssetPath(Class.ToString());
+	TArray<FJsonDataAssetPath> Results;
+
+#if WITH_EDITOR
+	// In the editor, we can simply use the asset registry to find our data.
+	TArray<FAssetData> AssetData;
+	AssetRegistry.GetAssetsByClass(ClassAssetPath, AssetData, bSearchSubClasses);
+
+	Results.Reserve(AssetData.Num());
+	for (const auto& Data : AssetData)
+	{
+		Results.Add(FJsonDataAssetPath::FromPackagePath(Data.GetSoftObjectPath().ToString()));
+	}
+#else
+	// Outside of that, we need to use our own cache as the generated .uassets are not included in cooked builds.
+	TSet<FTopLevelAssetPath> DerivedClassNames;
+	AssetRegistry.GetDerivedClassNames({ClassAssetPath}, {}, DerivedClassNames);
+
+	for (const auto& ClassPath : DerivedClassNames)
+	{
+		const auto pEntries = AssetMetaDataCache.PathsByClass.Find(ClassPath);
+		if (pEntries)
+		{
+			Results.Reserve(Results.Num() + pEntries->Paths.Num());
+			for (const auto& Path : pEntries->Paths)
+			{
+				Results.Add(Path);
+			}
+		}
+	}
+#endif
+
+	return Results;
 }
 
 void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyMissing)
@@ -728,6 +836,12 @@ bool UJsonDataAssetSubsystem::IsPathInSourceDirectoryOfNamedRoot(const FString& 
 	return false;
 }
 
+FString UJsonDataAssetSubsystem::GetMetaDataCacheFilePath(const EJsonDataAccessMode AccessMode) const
+{
+	return OUU::JsonData::Runtime::GetSourceRoot_Full(OUU::JsonData::Runtime::GameRootName, AccessMode)
+		/ TEXT("JsonMetaDataCache.json");
+}
+
 void UJsonDataAssetSubsystem::RegisterMountPoints(const FName& RootName)
 {
 #if WITH_EDITOR
@@ -896,10 +1010,13 @@ void UJsonDataAssetSubsystem::ModifyCook(TArray<FString>& OutExtraPackagesToCook
 	}
 
 	TSet<FName> DependencyPackages;
+	FJsonDataAssetMetaDataCache MetaDataCache;
 	for (auto& RootName : AllRootNames)
 	{
-		ModifyCook(RootName, OUT DependencyPackages);
+		ModifyCookInternal(RootName, OUT DependencyPackages, OUT MetaDataCache);
 	}
+
+	MetaDataCache.SaveToFile(GetMetaDataCacheFilePath(EJsonDataAccessMode::Write));
 
 	for (FName& PackageName : DependencyPackages)
 	{
@@ -913,7 +1030,10 @@ void UJsonDataAssetSubsystem::ModifyCook(TArray<FString>& OutExtraPackagesToCook
 		DependencyPackages.Num());
 }
 
-void UJsonDataAssetSubsystem::ModifyCook(const FName& RootName, TSet<FName>& OutDependencyPackages)
+void UJsonDataAssetSubsystem::ModifyCookInternal(
+	const FName& RootName,
+	TSet<FName>& OutDependencyPackages,
+	FJsonDataAssetMetaDataCache& OutMetaDataCache)
 {
 	const FString JsonDir_READ = OUU::JsonData::Runtime::GetSourceRoot_Full(RootName, EJsonDataAccessMode::Read);
 	if (!FPaths::DirectoryExists(JsonDir_READ))
@@ -927,7 +1047,8 @@ void UJsonDataAssetSubsystem::ModifyCook(const FName& RootName, TSet<FName>& Out
 	int32 NumJsonDataAssetsAdded = 0;
 
 	auto VisitorLambda = [&NumJsonDataAssetsAdded,
-						  &OutDependencyPackages](const TCHAR* FilePath, bool bIsDirectory) -> bool {
+						  &OutDependencyPackages,
+						  &OutMetaDataCache](const TCHAR* FilePath, bool bIsDirectory) -> bool {
 		if (bIsDirectory)
 			return true;
 
@@ -946,6 +1067,10 @@ void UJsonDataAssetSubsystem::ModifyCook(const FName& RootName, TSet<FName>& Out
 
 		// ReSharper disable once CppExpressionWithoutSideEffects
 		LoadedJsonDataAsset->ExportJsonFile();
+
+		auto& PackagePaths =
+			OutMetaDataCache.PathsByClass.FindOrAdd(LoadedJsonDataAsset->GetClass()->GetClassPathName());
+		PackagePaths.Paths.Add(Path);
 
 		const auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(PackagePath);
 		const FAssetIdentifier AssetIdentifier(*PackagePath, *ObjectName);
