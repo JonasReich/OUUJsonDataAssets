@@ -209,7 +209,7 @@ bool FJsonDataAssetMetaDataCache::SaveToFile(const FString& FilePath) const
 		return false;
 	}
 
-	if (FFileHelper::SaveStringToFile(JsonString, *FilePath) == false)
+	if (FFileHelper::SaveStringToFile(JsonString, *FilePath, FFileHelper::EEncodingOptions::ForceUTF8) == false)
 	{
 		UE_LOG(LogJsonDataAsset, Error, TEXT("Failed to save Json asset meta data cache to file %s."), *FilePath);
 		return false;

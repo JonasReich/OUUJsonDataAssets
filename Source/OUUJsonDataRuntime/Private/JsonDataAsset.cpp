@@ -280,7 +280,7 @@ bool UJsonDataAsset::ExportJsonFile() const
 	}
 #endif
 
-	if (!FFileHelper::SaveStringToFile(JsonString, *SavePath))
+	if (!FFileHelper::SaveStringToFile(JsonString, *SavePath, FFileHelper::EEncodingOptions::ForceUTF8))
 	{
 		UE_JSON_DATA_MESSAGELOG(Error, this, TEXT("Failed to save json string to file %s"), *SavePath);
 		return false;
