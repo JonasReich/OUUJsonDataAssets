@@ -57,9 +57,15 @@ UJsonDataAsset* FJsonDataAssetPath::ResolveObject() const
 
 UJsonDataAsset* FJsonDataAssetPath::LoadSynchronous() const
 {
-	// This attempts to find the object in memory (Path.LoadSynchronous)
-	// OR load cached generated asset (editor only).
+// This attempts to find the object in memory (Path.Get)
+// OR load cached generated asset (Path.LoadSynchronous, editor only).
+// Note: Avoiding a call to LoadSynchronous here means we do not need to flush the async loading thread because we know
+// this is not an asset that exists on disk.
+#if WITH_EDITOR
 	auto* ExistingAsset = Path.LoadSynchronous();
+#else
+	auto* ExistingAsset = Path.Get();
+#endif
 	// If the LoadSynchronous call above failed, we need to create a new package / in-memory object via the internals
 	return ExistingAsset ? ExistingAsset : UJsonDataAsset::LoadJsonDataAsset_Internal(*this, nullptr);
 }
