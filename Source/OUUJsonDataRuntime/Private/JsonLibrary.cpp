@@ -192,118 +192,150 @@ struct FJsonLibraryExportHelper
 		{
 			TArray<TSharedPtr<FJsonValue>> Out;
 			FScriptArrayHelper Helper(ArrayProperty, Value);
-			FScriptArrayHelper DefaultHelper(ArrayProperty, DefaultValue);
-			for (int32 i = 0, n = Helper.Num(); i < n; ++i)
+
+			if (Helper.Num() > 0)
 			{
-				void* DefaultElemPtr =
-					DefaultValue && DefaultHelper.IsValidIndex(i) ? DefaultHelper.GetRawPtr(i) : nullptr;
+				TOptional<FStructOnScope> OptDefaultValue;
 
-				auto Elem = UPropertyToJsonValue(
-					ArrayProperty->Inner,
-					Helper.GetRawPtr(i),
-					DefaultElemPtr,
-					CheckFlags & (~CPF_ParmFlags),
-					SkipFlags,
-					ExportCb,
-					ArrayProperty);
-
-				if (Elem.Value.IsValid())
+				if (const auto ValueStructProp = CastField<FStructProperty>(ArrayProperty->Inner))
 				{
-					// add to the array
-					Out.Push(Elem.Value);
+					OptDefaultValue = FStructOnScope(ValueStructProp->Struct);
 				}
-			}
-			return FOUUPropertyJsonResult::Json(MakeShared<FJsonValueArray>(Out));
-		}
-		else if (FSetProperty* SetProperty = CastField<FSetProperty>(Property))
-		{
-			TArray<TSharedPtr<FJsonValue>> Out;
-			FScriptSetHelper Helper(SetProperty, Value);
-			FScriptSetHelper DefaultHelper(SetProperty, DefaultValue);
-			for (int32 i = 0, n = Helper.Num(); n; ++i)
-			{
-				if (Helper.IsValidIndex(i))
-				{
-					void* DefaultElemPtr =
-						DefaultValue && DefaultHelper.IsValidIndex(i) ? DefaultHelper.GetElementPtr(i) : nullptr;
+				void* DefaultElemPtr = OptDefaultValue.IsSet() ? OptDefaultValue.GetValue().GetStructMemory() : nullptr;
 
+				for (int32 i = 0, n = Helper.Num(); i < n; ++i)
+				{
 					auto Elem = UPropertyToJsonValue(
-						SetProperty->ElementProp,
-						Helper.GetElementPtr(i),
+						ArrayProperty->Inner,
+						Helper.GetRawPtr(i),
 						DefaultElemPtr,
 						CheckFlags & (~CPF_ParmFlags),
 						SkipFlags,
 						ExportCb,
-						SetProperty);
+						ArrayProperty,
+						false);
 
 					if (Elem.Value.IsValid())
 					{
 						// add to the array
 						Out.Push(Elem.Value);
 					}
-
-					--n;
 				}
 			}
+
+			return FOUUPropertyJsonResult::Json(MakeShared<FJsonValueArray>(Out));
+		}
+		else if (FSetProperty* SetProperty = CastField<FSetProperty>(Property))
+		{
+			TArray<TSharedPtr<FJsonValue>> Out;
+			FScriptSetHelper Helper(SetProperty, Value);
+			if (Helper.Num() > 0)
+			{
+				TOptional<FStructOnScope> OptDefaultValue;
+
+				if (const auto ValueStructProp = CastField<FStructProperty>(SetProperty->ElementProp))
+				{
+					OptDefaultValue = FStructOnScope(ValueStructProp->Struct);
+				}
+				void* DefaultElemPtr = OptDefaultValue.IsSet() ? OptDefaultValue.GetValue().GetStructMemory() : nullptr;
+
+				for (int32 i = 0, n = Helper.Num(); n; ++i)
+				{
+					if (Helper.IsValidIndex(i))
+					{
+						auto Elem = UPropertyToJsonValue(
+							SetProperty->ElementProp,
+							Helper.GetElementPtr(i),
+							DefaultElemPtr,
+							CheckFlags & (~CPF_ParmFlags),
+							SkipFlags,
+							ExportCb,
+							SetProperty,
+							false);
+
+						if (Elem.Value.IsValid())
+						{
+							// add to the array
+							Out.Push(Elem.Value);
+						}
+
+						--n;
+					}
+				}
+			}
+
 			return FOUUPropertyJsonResult::Json(MakeShared<FJsonValueArray>(Out));
 		}
 		else if (FMapProperty* MapProperty = CastField<FMapProperty>(Property))
 		{
 			TSharedRef<FJsonObject> Out = MakeShared<FJsonObject>();
-
 			FScriptMapHelper Helper(MapProperty, Value);
-			FScriptMapHelper DefaultHelper(MapProperty, DefaultValue);
-			for (int32 i = 0, n = Helper.Num(); n; ++i)
+
+			if (Helper.Num() > 0)
 			{
-				if (Helper.IsValidIndex(i))
+				TOptional<FStructOnScope> OptDefaultKey;
+				TOptional<FStructOnScope> OptDefaultValue;
+				if (const auto KeyStructProp = CastField<FStructProperty>(MapProperty->KeyProp))
 				{
-					void* DefaultKeyPtr =
-						DefaultValue && DefaultHelper.IsValidIndex(i) ? DefaultHelper.GetKeyPtr(i) : nullptr;
-					void* DefaultValuePtr =
-						DefaultValue && DefaultHelper.IsValidIndex(i) ? DefaultHelper.GetValuePtr(i) : nullptr;
+					OptDefaultKey = FStructOnScope(KeyStructProp->Struct);
+				}
+				if (const auto ValueStructProp = CastField<FStructProperty>(MapProperty->ValueProp))
+				{
+					OptDefaultValue = FStructOnScope(ValueStructProp->Struct);
+				}
+				void* DefaultKeyPtr = OptDefaultKey.IsSet() ? OptDefaultKey.GetValue().GetStructMemory() : nullptr;
+				void* DefaultValuePtr =
+					OptDefaultValue.IsSet() ? OptDefaultValue.GetValue().GetStructMemory() : nullptr;
 
-					auto KeyElement = UPropertyToJsonValue(
-						MapProperty->KeyProp,
-						Helper.GetKeyPtr(i),
-						DefaultKeyPtr,
-						CheckFlags & (~CPF_ParmFlags),
-						SkipFlags,
-						ExportCb,
-						MapProperty);
-					auto ValueElement = UPropertyToJsonValue(
-						MapProperty->ValueProp,
-						Helper.GetValuePtr(i),
-						DefaultValuePtr,
-						CheckFlags & (~CPF_ParmFlags),
-						SkipFlags,
-						ExportCb,
-						MapProperty);
-
-					FString KeyString;
-					if (!KeyElement.Value->TryGetString(KeyString))
+				for (int32 i = 0, n = Helper.Num(); n; ++i)
+				{
+					if (Helper.IsValidIndex(i))
 					{
-						MapProperty->KeyProp
-							->ExportTextItem_Direct(KeyString, Helper.GetKeyPtr(i), nullptr, nullptr, 0);
-						if (KeyString.IsEmpty())
+						auto KeyElement = UPropertyToJsonValue(
+							MapProperty->KeyProp,
+							Helper.GetKeyPtr(i),
+							DefaultKeyPtr,
+							CheckFlags & (~CPF_ParmFlags),
+							SkipFlags,
+							ExportCb,
+							MapProperty,
+							false);
+						auto ValueElement = UPropertyToJsonValue(
+							MapProperty->ValueProp,
+							Helper.GetValuePtr(i),
+							DefaultValuePtr,
+							CheckFlags & (~CPF_ParmFlags),
+							SkipFlags,
+							ExportCb,
+							MapProperty,
+							false);
+
+						FString KeyString;
+						if (!KeyElement.Value->TryGetString(KeyString))
 						{
-							UE_LOG(
-								LogJsonDataAsset,
-								Error,
-								TEXT("Unable to convert key to string for property %s."),
-								*MapProperty->GetAuthoredName())
-							KeyString = FString::Printf(TEXT("Unparsed Key %d"), i);
+							MapProperty->KeyProp
+								->ExportTextItem_Direct(KeyString, Helper.GetKeyPtr(i), nullptr, nullptr, 0);
+							if (KeyString.IsEmpty())
+							{
+								UE_LOG(
+									LogJsonDataAsset,
+									Error,
+									TEXT("Unable to convert key to string for property %s."),
+									*MapProperty->GetAuthoredName())
+								KeyString = FString::Printf(TEXT("Unparsed Key %d"), i);
+							}
 						}
-					}
 
-					// Coerce camelCase map keys for Enum/FName properties
-					if (CastField<FEnumProperty>(MapProperty->KeyProp)
-						|| CastField<FNameProperty>(MapProperty->KeyProp))
-					{
-						KeyString = FJsonObjectConverter::StandardizeCase(KeyString);
-					}
-					Out->SetField(KeyString, ValueElement.Value);
+						// Coerce camelCase map keys for Enum/FName properties
+						if (CastField<FEnumProperty>(MapProperty->KeyProp)
+							|| CastField<FNameProperty>(MapProperty->KeyProp))
+						{
+							KeyString = FJsonObjectConverter::StandardizeCase(KeyString);
+						}
+						Out->SetField(KeyString, ValueElement.Value);
 
-					--n;
+						--n;
+					}
 				}
 			}
 
@@ -423,9 +455,10 @@ struct FJsonLibraryExportHelper
 		int64 CheckFlags,
 		int64 SkipFlags,
 		const FJsonObjectConverter::CustomExportCallback* ExportCb,
-		FProperty* OuterProperty = nullptr) const
+		FProperty* OuterProperty = nullptr,
+		const bool SkipIfValueMatchesDefault = true) const
 	{
-		if (SkipPropertyMatchingDefaultValues(Property, Value, DefaultValue))
+		if (SkipIfValueMatchesDefault && SkipPropertyMatchingDefaultValues(Property, Value, DefaultValue))
 		{
 			return FOUUPropertyJsonResult::Skip();
 		}
@@ -440,7 +473,8 @@ struct FJsonLibraryExportHelper
 				CheckFlags,
 				SkipFlags,
 				ExportCb,
-				OuterProperty);
+				OuterProperty,
+				SkipIfValueMatchesDefault);
 		}
 
 		TArray<TSharedPtr<FJsonValue>> Array;
