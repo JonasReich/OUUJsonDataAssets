@@ -547,7 +547,7 @@ TArray<FJsonDataAssetPath> UJsonDataAssetSubsystem::GetJsonAssetsByClass(
 	Results.Reserve(AssetData.Num());
 	for (const auto& Data : AssetData)
 	{
-		Results.Add(FJsonDataAssetPath::FromPackagePath(Data.GetSoftObjectPath().ToString()));
+		Results.Add(FJsonDataAssetPath::FromSoftObjectPath(Data.GetSoftObjectPath()));
 	}
 #else
 	// Outside of that, we need to use our own cache as the generated .uassets are not included in cooked builds.

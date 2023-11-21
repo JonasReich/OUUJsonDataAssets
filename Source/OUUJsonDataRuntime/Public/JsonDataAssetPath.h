@@ -44,6 +44,20 @@ public:
 		return Result;
 	}
 
+	FORCEINLINE static FJsonDataAssetPath FromObjectPath(const FString& ObjectPath)
+	{
+		FJsonDataAssetPath Result;
+		Result.SetObjectPath(ObjectPath);
+		return Result;
+	}
+
+	FORCEINLINE static FJsonDataAssetPath FromSoftObjectPath(FSoftObjectPath ObjectPath)
+	{
+		FJsonDataAssetPath Result;
+		Result.Path = MoveTemp(ObjectPath);
+		return Result;
+	}
+
 	/** Try to resolve the path in memory, do NOT load if not found. */
 	UJsonDataAsset* ResolveObject() const;
 
