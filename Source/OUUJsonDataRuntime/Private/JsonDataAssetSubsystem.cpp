@@ -258,6 +258,8 @@ bool FJsonDataAssetMetaDataCache::LoadFromFile(const FString& FilePath)
 
 void UJsonDataAssetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("UJsonDataAssetSubsystem::Initialize"), STAT_Inititalize, STATGROUP_OUUJsonData);
+
 	Super::Initialize(Collection);
 
 	// Don't add to plugin root names!!!
@@ -326,6 +328,11 @@ bool UJsonDataAssetSubsystem::AutoExportJsonEnabled()
 
 void UJsonDataAssetSubsystem::NetSerializePath(FJsonDataAssetPath& Path, FArchive& Ar)
 {
+	DECLARE_SCOPE_CYCLE_COUNTER(
+		TEXT("UJsonDataAssetSubsystem::NetSerializePath"),
+		STAT_NetSerialize,
+		STATGROUP_OUUJsonData);
+
 	UJsonDataAssetSubsystem* SubsystemInstance = nullptr;
 	if (GEngine && GEngine->IsInitialized())
 	{
@@ -452,6 +459,8 @@ void UJsonDataAssetSubsystem::NetSerializePath(FJsonDataAssetPath& Path, FArchiv
 
 void UJsonDataAssetSubsystem::ImportAllAssets(bool bOnlyMissing)
 {
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("UJsonDataAssetSubsystem::ImportAll"), STAT_ImportAll, STATGROUP_OUUJsonData);
+
 	if (bJsonDataAssetListBuilt == false)
 	{
 		RescanAllAssets();
@@ -488,8 +497,15 @@ void UJsonDataAssetSubsystem::ImportAllAssets(bool bOnlyMissing)
 	bIsInitialAssetImportCompleted = true;
 }
 
+DECLARE_DWORD_ACCUMULATOR_STAT_EXTERN(
+	TEXT("Num Assets"),
+	STAT_JsonDataAsset_NumAssets, STATGROUP_OUUJsonData, );
+DEFINE_STAT(STAT_JsonDataAsset_NumAssets);
+
 void UJsonDataAssetSubsystem::RescanAllAssets()
 {
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("UJsonDataAssetSubsystem::Rescan"), STAT_Rescan, STATGROUP_OUUJsonData);
+
 	AllJsonDataAssetsByIndex.Empty();
 
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
@@ -529,12 +545,21 @@ void UJsonDataAssetSubsystem::RescanAllAssets()
 	}
 
 	bJsonDataAssetListBuilt = true;
+
+	// Use this list to track how many assets there are in total.
+	// If we ever want to support dynamic loading/unloading it has to be reflected here, so this should be ok.
+	SET_DWORD_STAT(STAT_JsonDataAsset_NumAssets, AllJsonDataAssetsByPath.Num());
 }
 
 TArray<FJsonDataAssetPath> UJsonDataAssetSubsystem::GetJsonAssetsByClass(
 	TSoftClassPtr<UJsonDataAsset> Class,
 	const bool bSearchSubClasses) const
 {
+	DECLARE_SCOPE_CYCLE_COUNTER(
+		TEXT("UJsonDataAssetSubsystem::GetAssetsByClass"),
+		STAT_GetByClass,
+		STATGROUP_OUUJsonData);
+
 	const auto& AssetRegistry = IAssetRegistry::GetChecked();
 	const FTopLevelAssetPath ClassAssetPath(Class.ToString());
 	TArray<FJsonDataAssetPath> Results;
@@ -573,6 +598,8 @@ TArray<FJsonDataAssetPath> UJsonDataAssetSubsystem::GetJsonAssetsByClass(
 
 void UJsonDataAssetSubsystem::ImportAllAssets(const FName& RootName, bool bOnlyMissing)
 {
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("UJsonDataAssetSubsystem::ImportAll"), STAT_ImportAll, STATGROUP_OUUJsonData);
+
 	const FString JsonDir = OUU::JsonData::Runtime::GetSourceRoot_Full(RootName, EJsonDataAccessMode::Read);
 	if (!FPaths::DirectoryExists(JsonDir))
 	{

@@ -124,6 +124,11 @@ struct FJsonLibraryExportHelper
 		FProperty* OuterProperty,
 		const bool SkipIfValueMatchesDefault = true) const
 	{
+		DECLARE_CYCLE_STAT(
+			TEXT("ConvertScalarFPropertyToJsonValue"),
+			STAT_ConvertScalarFPropertyToJsonValue,
+			STATGROUP_OUUJsonData);
+
 		if (SkipIfValueMatchesDefault && SkipPropertyMatchingDefaultValues(Property, Value, DefaultValue))
 		{
 			return FOUUPropertyJsonResult::Skip();
@@ -510,6 +515,8 @@ struct FJsonLibraryExportHelper
 		int64 SkipFlags,
 		const FJsonObjectConverter::CustomExportCallback* ExportCb) const
 	{
+		DECLARE_CYCLE_STAT(TEXT("UStructToJsonAttributes"), STAT_UStructToJsonAttributes, STATGROUP_OUUJsonData);
+
 		OutMinimumOneValueSet = false;
 
 		if (SkipFlags == 0)
@@ -780,6 +787,11 @@ struct FJsonLibraryImportHelper
 		const bool bStrictMode,
 		FText* OutFailReason)
 	{
+		DECLARE_CYCLE_STAT(
+			TEXT("ConvertScalarJsonValueToFPropertyWithContainer"),
+			STAT_ConvertScalarJsonValueToFPropertyWithContainer,
+			STATGROUP_OUUJsonData);
+
 		if (FEnumProperty* EnumProperty = CastField<FEnumProperty>(Property))
 		{
 			if (JsonValue->Type == EJson::String)
@@ -1802,6 +1814,11 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 	const bool bStrictMode,
 	FText* OutFailReason)
 {
+	DECLARE_CYCLE_STAT(
+		TEXT("JsonAttributesToUStructWithContainer"),
+		STAT_JsonAttributesToUStructWithContainer,
+		STATGROUP_OUUJsonData);
+
 	if (StructDefinition == FJsonObjectWrapper::StaticStruct())
 	{
 		// Just copy it into the object

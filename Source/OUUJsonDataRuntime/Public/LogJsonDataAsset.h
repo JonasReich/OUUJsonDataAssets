@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 
+#include "Stats/Stats2.h"
+
 // ReSharper disable CppUnusedIncludeDirective
 #include "Logging/MessageLog.h"
 #include "Misc/UObjectToken.h"
@@ -18,3 +20,5 @@ OUUJSONDATARUNTIME_API DECLARE_LOG_CATEGORY_EXTERN(LogJsonDataAsset, Log, All);
 		.AddMessage(FTokenizedMessage::Create(EMessageSeverity::Severity)                                              \
 						->AddToken(FUObjectToken::Create(Obj))                                                         \
 						->AddToken(FTextToken::Create(FText::FromString(FString::Printf(FmtText, ##__VA_ARGS__)))));
+
+DECLARE_STATS_GROUP(TEXT("OUUJsonData"), STATGROUP_OUUJsonData, STATCAT_Advanced);

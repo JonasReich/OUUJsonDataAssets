@@ -67,6 +67,8 @@ bool UJsonDataAsset::IsFileBasedJsonAsset() const
 
 bool UJsonDataAsset::ImportJson(TSharedPtr<FJsonObject> JsonObject, bool bCheckClassMatches)
 {
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("UJsonDataAsset::ImportJson"), STAT_ImportJson, STATGROUP_OUUJsonData);
+
 	// ---
 	// Header information
 	// ---
@@ -170,6 +172,8 @@ bool UJsonDataAsset::ImportJson(TSharedPtr<FJsonObject> JsonObject, bool bCheckC
 
 TSharedRef<FJsonObject> UJsonDataAsset::ExportJson() const
 {
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("UJsonDataAsset::ExportJson"), STAT_ExportJson, STATGROUP_OUUJsonData);
+
 	auto Result = MakeShared<FJsonObject>();
 
 	// Header information
@@ -335,6 +339,11 @@ UJsonDataAsset* UJsonDataAsset::LoadJsonDataAsset_Internal(FJsonDataAssetPath Pa
 	{
 		return nullptr;
 	}
+
+	DECLARE_SCOPE_CYCLE_COUNTER(
+		TEXT("UJsonDataAsset::LoadJsonDataAsset_Internal"),
+		STAT_LoadJsonInternal,
+		STATGROUP_OUUJsonData);
 
 	const FString InPackagePath = Path.GetPackagePath();
 	const FString LoadPath = OUU::JsonData::Runtime::PackageToSourceFull(InPackagePath, EJsonDataAccessMode::Read);
