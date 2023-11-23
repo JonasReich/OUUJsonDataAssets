@@ -10,6 +10,7 @@
 #include "Misc/PackageName.h"
 #include "UObject/ObjectRedirector.h"
 #include "UObject/Package.h"
+#include "UObject/StructOnScope.h"
 #include "UObject/TextProperty.h"
 
 /** Static switch for types: Select type based on Condition */
