@@ -290,13 +290,7 @@ void UJsonDataAssetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	FEditorDelegates::OnPackageDeleted.AddUObject(this, &UJsonDataAssetSubsystem::HandlePackageDeleted);
 	FEditorDelegates::PreBeginPIE.AddUObject(this, &UJsonDataAssetSubsystem::HandlePreBeginPIE);
 
-	PRAGMA_DISABLE_DEPRECATION_WARNINGS
-	// I know, disabling deprecation warnings is shit, but this is easy to fix when it eventually breaks.
-	// And having it delegate based is cleaner (and hopefully possible in 5.2) via ModifyCookDelegate,
-	// which seems to be accidentally left private in 5.0 / 5.1
-	// ReSharper disable once CppDeprecatedEntity
-	FGameDelegates::Get().GetCookModificationDelegate().BindUObject(this, &UJsonDataAssetSubsystem::ModifyCook);
-	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	FGameDelegates::Get().GetModifyCookDelegate().AddUObject(this, &UJsonDataAssetSubsystem::ModifyCook);
 #else
 	// In non-editor builds, load Json asset meta data cache file.
 	AssetMetaDataCache.LoadFromFile(GetMetaDataCacheFilePath(EJsonDataAccessMode::Read));
@@ -1023,7 +1017,10 @@ void UJsonDataAssetSubsystem::HandlePackageDeleted(UPackage* Package)
 	OUU::JsonData::Runtime::Private::Delete(PackagePath);
 }
 
-void UJsonDataAssetSubsystem::ModifyCook(TArray<FString>& OutExtraPackagesToCook)
+void UJsonDataAssetSubsystem::ModifyCook(
+	TConstArrayView<const ITargetPlatform*> InTargetPlatforms,
+	TArray<FName>& InOutPackagesToCook,
+	TArray<FName>& InOutPackagesToNeverCook)
 {
 	IAssetRegistry& AssetRegistry = *IAssetRegistry::Get();
 	AssetRegistry.WaitForCompletion();
@@ -1047,7 +1044,7 @@ void UJsonDataAssetSubsystem::ModifyCook(TArray<FString>& OutExtraPackagesToCook
 
 	for (FName& PackageName : DependencyPackages)
 	{
-		OutExtraPackagesToCook.Add(PackageName.ToString());
+		InOutPackagesToCook.Add(PackageName);
 	}
 
 	UE_LOG(

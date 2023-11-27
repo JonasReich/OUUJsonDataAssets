@@ -11,6 +11,8 @@
 
 #include "JsonDataAssetSubsystem.generated.h"
 
+class ITargetPlatform;
+
 USTRUCT()
 struct FJsonDataAssetPaths
 {
@@ -39,6 +41,7 @@ UCLASS(BlueprintType)
 class OUUJSONDATARUNTIME_API UJsonDataAssetSubsystem : public UEngineSubsystem
 {
 	GENERATED_BODY()
+
 public:
 	FORCEINLINE static UJsonDataAssetSubsystem& Get()
 	{
@@ -101,7 +104,12 @@ public:
 	const TMap<FName, FString>& GetSourceMappings(EJsonDataAccessMode AccessMode) const;
 	const TMap<FName, FString>& GetSourceMappings(bool bUseCookedContent) const;
 	const TArray<FString>& GetAllSourceDirectories(EJsonDataAccessMode AccessMode) const;
-	const TArray<FName>& GetAllPluginRootNames() const { return AllPluginRootNames; }
+
+	const TArray<FName>& GetAllPluginRootNames() const
+	{
+		return AllPluginRootNames;
+	}
+
 	FString GetVirtualRoot(const FName& RootName) const;
 
 	/** @retuns NAME_None if the path does not start with a registered virtual root. */
@@ -120,6 +128,7 @@ public:
 	// Called whenever a new plugin root is added.
 	// Required for the content browser extension to be able to react to late plugin registrations.
 	DECLARE_EVENT_OneParam(UJsonDataAssetSubsystem, FOnNewPluginRootAdded, const FName&);
+
 	FOnNewPluginRootAdded OnNewPluginRootAdded;
 
 private:
@@ -130,7 +139,7 @@ private:
 
 	void PostEngineInit();
 
-#if WITH_EDITOR
+	#if WITH_EDITOR
 	void HandlePreBeginPIE(const bool bIsSimulating);
 
 	void CleanupAssetCache(const FName& RootName);
@@ -138,13 +147,15 @@ private:
 	UFUNCTION()
 	void HandlePackageDeleted(UPackage* Package);
 
-	UFUNCTION()
-	void ModifyCook(TArray<FString>& OutExtraPackagesToCook);
+	void ModifyCook(
+		TConstArrayView<const ITargetPlatform*> InTargetPlatforms,
+		TArray<FName>& InOutPackagesToCook,
+		TArray<FName>& InOutPackagesToNeverCook);
 	void ModifyCookInternal(
 		const FName& RootName,
 		TSet<FName>& OutDependencyPackages,
 		FJsonDataAssetMetaDataCache& OutMetaDataCache);
-#endif
+	#endif
 
 	bool bIsInitialAssetImportCompleted = false;
 	bool bAutoExportJson = false;
