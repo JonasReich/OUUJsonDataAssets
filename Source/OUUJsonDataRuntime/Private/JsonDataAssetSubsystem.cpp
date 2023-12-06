@@ -11,7 +11,6 @@
 #include "JsonDataCacheVersion.h"
 #include "JsonLibrary.h"
 #include "LogJsonDataAsset.h"
-#include "OUUJsonDataRuntimeVersion.h"
 #include "UObject/SavePackage.h"
 
 #if WITH_EDITOR
@@ -491,9 +490,7 @@ void UJsonDataAssetSubsystem::ImportAllAssets(bool bOnlyMissing)
 	bIsInitialAssetImportCompleted = true;
 }
 
-DECLARE_DWORD_ACCUMULATOR_STAT_EXTERN(
-	TEXT("Num Assets"),
-	STAT_JsonDataAsset_NumAssets, STATGROUP_OUUJsonData, );
+DECLARE_DWORD_ACCUMULATOR_STAT_EXTERN(TEXT("Num Assets"), STAT_JsonDataAsset_NumAssets, STATGROUP_OUUJsonData, );
 DEFINE_STAT(STAT_JsonDataAsset_NumAssets);
 
 void UJsonDataAssetSubsystem::RescanAllAssets()
@@ -1027,35 +1024,82 @@ void UJsonDataAssetSubsystem::ModifyCook(
 
 	ensure(bIsInitialAssetImportCompleted);
 
-	// Delete files from previous cook
-	for (auto SourceDir : GetAllSourceDirectories(EJsonDataAccessMode::Write))
+	const bool bIterateCook = FParse::Param(FCommandLine::Get(), TEXT("iterate"));
+	const bool bCookJsonData = FParse::Param(FCommandLine::Get(), TEXT("NoJsonData")) == false;
+	const bool bCookJsonDataDependencies = FParse::Param(FCommandLine::Get(), TEXT("NoJsonDataDependencies")) == false;
+	const bool bCookDeveloperContent = FParse::Param(FCommandLine::Get(), TEXT("NoDev")) == false;
+
+	UE_LOG(
+		LogJsonDataAsset,
+		Display,
+		TEXT("JsonDataAseet Cook Settings:\n"
+			 "\t- Iterate:\t%s\n"
+			 "\t- CookJsonData:\t%s\n"
+			 "\t- CookJsonDataDependencies:\t%s\n"
+			 "\t- CookDeveloperContent:\t%s"),
+		*LexToString(bIterateCook),
+		*LexToString(bCookJsonData),
+		*LexToString(bCookJsonDataDependencies),
+		*LexToString(bCookDeveloperContent));
+
+	if (bCookJsonData == false /* || bIterateCook == false */)
 	{
-		FPlatformFileManager::Get().GetPlatformFile().DeleteDirectoryRecursively(*SourceDir);
+		// Delete files from previous cook
+		for (auto SourceDir : GetAllSourceDirectories(EJsonDataAccessMode::Write))
+		{
+			FPlatformFileManager::Get().GetPlatformFile().DeleteDirectoryRecursively(*SourceDir);
+		}
+	}
+
+	if (bCookJsonData == false)
+	{
+		UE_LOG(LogJsonDataAsset, Display, TEXT("UJsonDataAssetLibrary::ModifyCook - Skipped json data cook"));
+		return;
 	}
 
 	TSet<FName> DependencyPackages;
 	FJsonDataAssetMetaDataCache MetaDataCache;
 	for (auto& RootName : AllRootNames)
 	{
-		ModifyCookInternal(RootName, OUT DependencyPackages, OUT MetaDataCache);
+		ModifyCookInternal(
+			RootName,
+			bIterateCook,
+			bCookDeveloperContent,
+			bCookJsonDataDependencies,
+			OUT DependencyPackages,
+			OUT MetaDataCache);
 	}
 
+	// ReSharper disable once CppExpressionWithoutSideEffects
 	MetaDataCache.SaveToFile(GetMetaDataCacheFilePath(EJsonDataAccessMode::Write));
 
-	for (FName& PackageName : DependencyPackages)
+	if (bCookJsonDataDependencies)
 	{
-		InOutPackagesToCook.Add(PackageName);
-	}
+		for (FName& PackageName : DependencyPackages)
+		{
+			InOutPackagesToCook.Add(PackageName);
+		}
 
-	UE_LOG(
-		LogJsonDataAsset,
-		Display,
-		TEXT("UJsonDataAssetLibrary::ModifyCook - Added %i dependency assets for json assets to cook"),
-		DependencyPackages.Num());
+		UE_LOG(
+			LogJsonDataAsset,
+			Display,
+			TEXT("UJsonDataAssetLibrary::ModifyCook - Added %i dependency assets for json assets to cook"),
+			DependencyPackages.Num());
+	}
+	else
+	{
+		UE_LOG(
+			LogJsonDataAsset,
+			Display,
+			TEXT("UJsonDataAssetLibrary::ModifyCook - Skipped dependency assets for json assets to cook"));
+	}
 }
 
 void UJsonDataAssetSubsystem::ModifyCookInternal(
 	const FName& RootName,
+	const bool bIterateCook,
+	const bool bCookDeveloperContent,
+	const bool bCookJsonDataDependencies,
 	TSet<FName>& OutDependencyPackages,
 	FJsonDataAssetMetaDataCache& OutMetaDataCache)
 {
@@ -1065,14 +1109,22 @@ void UJsonDataAssetSubsystem::ModifyCookInternal(
 		return;
 	}
 
+	const FString DeveloperDir = JsonDir_READ / TEXT("Developers");
+
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 	IAssetRegistry& AssetRegistry = *IAssetRegistry::Get();
 
 	int32 NumJsonDataAssetsAdded = 0;
 
-	auto VisitorLambda = [&NumJsonDataAssetsAdded,
+	auto VisitorLambda = [bIterateCook,
+						  bCookDeveloperContent,
+						  bCookJsonDataDependencies,
+						  &DeveloperDir,
+						  &PlatformFile,
+						  &NumJsonDataAssetsAdded,
 						  &OutDependencyPackages,
-						  &OutMetaDataCache](const TCHAR* FilePath, bool bIsDirectory) -> bool {
+						  &OutMetaDataCache,
+						  &AssetRegistry](const TCHAR* FilePath, bool bIsDirectory) -> bool {
 		if (bIsDirectory)
 			return true;
 
@@ -1082,36 +1134,70 @@ void UJsonDataAssetSubsystem::ModifyCookInternal(
 		if (OUU::JsonData::Runtime::ShouldIgnoreInvalidExtensions() && FPaths::GetBaseFilename(FilePath).Contains("."))
 			return true;
 
-		const auto PackagePath = OUU::JsonData::Runtime::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
-		const auto Path = FJsonDataAssetPath::FromPackagePath(PackagePath);
+		if (bCookDeveloperContent == false && FStringView(FilePath).StartsWith(DeveloperDir))
+		{
+			UE_LOG(
+				LogJsonDataAsset,
+				Verbose,
+				TEXT("Skipped local path %s, because it's inside of a developers directory"),
+				FilePath);
+			return true;
+		}
+
+		const auto PackagePathString = OUU::JsonData::Runtime::SourceFullToPackage(FilePath, EJsonDataAccessMode::Read);
+		const auto RealPackagePath = FPackagePath::FromPackageNameChecked(PackagePathString);
+		const auto Path = FJsonDataAssetPath::FromPackagePath(PackagePathString);
+
+		bool bSkipResave = false;
+		if (bIterateCook)
+		{
+			auto CachedAssetPath = RealPackagePath.GetLocalFullPath();
+			// Only re-save assets that did not change since last cook in iterative mode
+			if (PlatformFile.GetTimeStamp(*CachedAssetPath) > PlatformFile.GetTimeStamp(FilePath))
+			{
+				UE_LOG(
+					LogJsonDataAsset,
+					Verbose,
+					TEXT("Skipped resaving local path %s, because it was newer than source and iterative cook is "
+						 "enabled"),
+					*CachedAssetPath);
+				bSkipResave = true;
+			}
+		}
 
 		const auto* LoadedJsonDataAsset = Path.LoadSynchronous();
 		if (!ensure(LoadedJsonDataAsset))
 			return true;
 
-		// ReSharper disable once CppExpressionWithoutSideEffects
-		LoadedJsonDataAsset->ExportJsonFile();
+		if (bSkipResave)
+		{
+			// ReSharper disable once CppExpressionWithoutSideEffects
+			LoadedJsonDataAsset->ExportJsonFile();
+		}
 
 		auto& PackagePaths =
 			OutMetaDataCache.PathsByClass.FindOrAdd(LoadedJsonDataAsset->GetClass()->GetClassPathName());
 		PackagePaths.Paths.Add(Path);
 
-		const auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(PackagePath);
-		const FAssetIdentifier AssetIdentifier(*PackagePath, *ObjectName);
-
-		TArray<FAssetIdentifier> Dependencies;
-		IAssetRegistry::Get()->GetDependencies(AssetIdentifier, OUT Dependencies);
-
-		for (auto& Dependency : Dependencies)
+		if (bCookJsonDataDependencies)
 		{
-			if (Dependency.IsPackage())
+			const auto ObjectName = OUU::JsonData::Runtime::PackageToObjectName(PackagePathString);
+			const FAssetIdentifier AssetIdentifier(*PackagePathString, *ObjectName);
+
+			TArray<FAssetIdentifier> Dependencies;
+			AssetRegistry.GetDependencies(AssetIdentifier, OUT Dependencies);
+
+			for (auto& Dependency : Dependencies)
 			{
-				auto PackageName = Dependency.PackageName;
-				if (OUU::JsonData::Runtime::PackageIsJsonData(PackageName.ToString()) == false)
+				if (Dependency.IsPackage())
 				{
-					// We don't want to add json data assets directly to this list.
-					// As they are on the do not cook list, they will throw errors.
-					OutDependencyPackages.Add(PackageName);
+					auto PackageName = Dependency.PackageName;
+					if (OUU::JsonData::Runtime::PackageIsJsonData(PackageName.ToString()) == false)
+					{
+						// We don't want to add json data assets directly to this list.
+						// As they are on the do not cook list, they will throw errors.
+						OutDependencyPackages.Add(PackageName);
+					}
 				}
 			}
 		}

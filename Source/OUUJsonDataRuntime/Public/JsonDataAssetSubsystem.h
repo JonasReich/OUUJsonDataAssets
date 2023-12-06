@@ -153,6 +153,9 @@ private:
 		TArray<FName>& InOutPackagesToNeverCook);
 	void ModifyCookInternal(
 		const FName& RootName,
+		const bool bIterateCook,
+		const bool bCookDeveloperContent,
+		const bool bCookJsonDataDependencies,
 		TSet<FName>& OutDependencyPackages,
 		FJsonDataAssetMetaDataCache& OutMetaDataCache);
 	#endif
