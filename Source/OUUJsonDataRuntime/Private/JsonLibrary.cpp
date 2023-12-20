@@ -13,6 +13,10 @@
 #include "UObject/StructOnScope.h"
 #include "UObject/TextProperty.h"
 
+// GRIMLORE Start dlehn: Check property redirects in case the property has been renamed.
+#include "UObject/CoreRedirects.h"
+// GRIMLORE End
+
 /** Static switch for types: Select type based on Condition */
 template <bool Condition, typename TrueType, typename FalseType>
 struct TConditionalType;
@@ -1835,12 +1839,31 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 		return true;
 	}
 
-	// iterate over the struct properties
-	for (TFieldIterator<FProperty> PropIt(StructDefinition); PropIt; ++PropIt)
+	// GRIMLORE Start dlehn: Check property redirects in case the property has been renamed.
+	for (const auto& AttribEntry : JsonAttributes)
 	{
-		FProperty* Property = *PropIt;
+		const FName PropertyName(AttribEntry.Key);
+		auto Property = StructDefinition->FindPropertyByName(PropertyName);
+		if (Property == nullptr)
+		{
+			const FCoreRedirectObjectName
+				RedirectName(PropertyName, StructDefinition->GetFName(), StructDefinition->GetOutermost()->GetFName());
 
-		// Check to see if we should ignore this property
+			const auto RedirectedName =
+				FCoreRedirects::GetRedirectedName(ECoreRedirectFlags::Type_Property, RedirectName);
+			if (RedirectedName.ObjectName != PropertyName)
+			{
+				Property = StructDefinition->FindPropertyByName(RedirectedName.ObjectName);
+			}
+		}
+
+		if (Property == nullptr)
+		{
+			// Should we log a warning/error if we still have properties in the JSON data that aren't in the struct
+			// definition in strict mode?
+			continue;
+		}
+
 		if (CheckFlags != 0 && !Property->HasAnyPropertyFlags(CheckFlags))
 		{
 			continue;
@@ -1850,32 +1873,7 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 			continue;
 		}
 
-		// find a JSON value matching this property name
-		FString PropertyName = StructDefinition->GetAuthoredNameForField(Property);
-		const TSharedPtr<FJsonValue>* JsonValue = JsonAttributes.Find(PropertyName);
-
-		if (!JsonValue)
-		{
-			if (bStrictMode)
-			{
-				UE_LOG(
-					LogJsonDataAsset,
-					Error,
-					TEXT("JsonObjectToUStruct - Missing JSON value named %s"),
-					*PropertyName);
-				if (OutFailReason)
-				{
-					*OutFailReason =
-						FText::Format(INVTEXT("Missing JSON value named {0}"), FText::FromString(PropertyName));
-				}
-				return false;
-			}
-
-			// we allow values to not be found since this mirrors the typical UObject mantra that all the fields are
-			// optional when deserializing
-			continue;
-		}
-
+		const auto JsonValue = &AttribEntry.Value;
 		if (JsonValue->IsValid() && !(*JsonValue)->IsNull())
 		{
 			void* Value = Property->ContainerPtrToValuePtr<uint8>(OutStruct);
@@ -1895,28 +1893,19 @@ bool FJsonLibraryImportHelper::JsonAttributesToUStructWithContainer(
 					LogJsonDataAsset,
 					Error,
 					TEXT("JsonObjectToUStruct - Unable to import JSON value into property %s"),
-					*PropertyName);
+					*PropertyName.ToString());
 				if (OutFailReason)
 				{
 					*OutFailReason = FText::Format(
 						INVTEXT("Unable to import JSON value into property {0}\n{1}"),
-						FText::FromString(PropertyName),
+						FText::FromName(PropertyName),
 						*OutFailReason);
 				}
 				return false;
 			}
 		}
-
-		if (--NumUnclaimedProperties <= 0)
-		{
-			// Should we log a warning/error if we still have properties in the JSON data that aren't in the struct
-			// definition in strict mode?
-
-			// If we found all properties that were in the JsonAttributes map, there is no reason to keep looking
-			// for more.
-			break;
-		}
 	}
+	// GRIMLORE End
 
 	// GRIMLORE Start dlehn: Ensure objects loaded from json receive PostLoad calls
 	if (StructDefinition->IsChildOf<UObject>())
