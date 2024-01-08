@@ -232,7 +232,16 @@ public:
 
 	FORCEINLINE UJsonDataAsset* Get() const
 	{
-		if (HardReference == nullptr)
+#if WITH_EDITOR
+		if (GIsEditor && GIsPlayInEditorWorld == false)
+		{
+			// While in the editor, our path may be changed via the UI at any time, so we need to always re-resolve the
+			// reference. We skip doing that while in PIE for performance reasons.
+			HardReference = Path.LoadSynchronous();
+		}
+		else
+#endif
+			if (HardReference == nullptr)
 		{
 			HardReference = Path.LoadSynchronous();
 		}

@@ -35,6 +35,14 @@ bool FJsonAssetReferenceFilter::PassesFilter(const FAssetData& AssetData, FText*
 		return true;
 	}
 
+	if (Context.ReferencingAssets.Num() == 1 && Context.ReferencingAssets[0].GetClass() == UWorld::StaticClass())
+	{
+		// We need to "allow" worlds to reference json data assets directly as this will be checked when dropping an
+		// asset into the level editor viewport. As above, if a world somehow manages to *actually* directly reference a
+		// json asset, that should be caught by UAssetValidator_JsonDataAssetReferences.
+		return true;
+	}
+
 	if (AssetData.AssetClassPath.IsValid() && JsonDataAssetClassPaths.Contains(AssetData.AssetClassPath))
 	{
 		if (Context.ReferencingAssets.Contains(PassFilterKey()))
